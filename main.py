@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Simple FastAPI application with health and interact endpoints."""
 
-import asyncio
-import time
 import uuid
 from datetime import datetime
+import time
 
 from fastapi import FastAPI, HTTPException
+import logfire
+from dotenv import load_dotenv
 
 from src.models import InteractRequest, InteractResponse, HealthResponse
+from src.agent import generate_response
+
+load_dotenv()
 
 # Create FastAPI app
 app = FastAPI(
@@ -16,6 +20,9 @@ app = FastAPI(
     version="0.1.0",
     description="A simple FastAPI application with health and interact endpoints"
 )
+
+logfire.configure()
+logfire.instrument_fastapi(app)
 
 # Track app start time for uptime
 app_start_time = time.time()
@@ -36,29 +43,13 @@ async def interact(request: InteractRequest):
     
     Simulates processing with a 1-second delay.
     """
-    start_time = time.time()
     request_id = str(uuid.uuid4())
     
     try:
-        # Mock processing logic with 1 second sleep
-        await asyncio.sleep(1)
-        
-        # Generate response message
-        response_message = f"Processed your message: '{request.message}'"
-        if request.user_id:
-            response_message += f" (User: {request.user_id})"
-        
-        processing_time = time.time() - start_time
-        
-        return InteractResponse(
-            message=response_message,
-            processed_at=datetime.utcnow(),
-            request_id=request_id,
-            processing_time=processing_time
-        )
+        return await generate_response(request, request_id)
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 async def root():

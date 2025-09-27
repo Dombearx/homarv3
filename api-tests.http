@@ -1,0 +1,17 @@
+### Homarv3 API Tests
+### Make sure the server is running on http://localhost:8000
+
+### Root endpoint - Get API information
+GET http://localhost:8000/
+
+### Health check endpoint
+GET http://localhost:8000/health
+
+### Interact endpoint - With user ID
+POST http://localhost:8000/interact
+Content-Type: application/json
+
+{
+  "message": "Test message with user",
+  "user_id": "user123"
+}

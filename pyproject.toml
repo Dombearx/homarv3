@@ -4,13 +4,15 @@ version = "0.1.0"
 description = ""
 authors = ["Dombear <domin.dober@gmail.com>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.12"
 fastapi = "^0.117.1"
 uvicorn = "^0.37.0"
 logfire = {extras = ["fastapi"], version = "^4.10.0"}
 python-dotenv = "^1.1.1"
+loguru = "^0.7.3"
 
 
 [build-system]

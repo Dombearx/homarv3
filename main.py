@@ -8,6 +8,9 @@ import time
 from fastapi import FastAPI, HTTPException
 import logfire
 from dotenv import load_dotenv
+from loguru import logger
+
+logfire.install_auto_tracing(modules=['src'], min_duration=0)
 
 from src.models import InteractRequest, InteractResponse, HealthResponse
 from src.agent import generate_response
@@ -23,9 +26,10 @@ app = FastAPI(
 
 logfire.configure()
 logfire.instrument_fastapi(app)
+# logfire.instrument_system_metrics()
 
-# Track app start time for uptime
-app_start_time = time.time()
+logger.configure(handlers=[logfire.loguru_handler()])
+
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():

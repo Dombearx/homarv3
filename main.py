@@ -5,17 +5,17 @@ import uuid
 from datetime import datetime
 import time
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 import logfire
 from dotenv import load_dotenv
 from loguru import logger
 
-logfire.install_auto_tracing(modules=['src'], min_duration=0)
+load_dotenv()
+# logfire.install_auto_tracing(modules=['src'], min_duration=0)
 
 from src.models import InteractRequest, InteractResponse, HealthResponse
-from src.agent import generate_response
+from src.homar import run_homar
 
-load_dotenv()
 
 # Create FastAPI app
 app = FastAPI(
@@ -24,8 +24,9 @@ app = FastAPI(
     description="A simple FastAPI application with health and interact endpoints"
 )
 
-logfire.configure()
+logfire.configure(send_to_logfire=True)
 logfire.instrument_fastapi(app)
+logfire.instrument_pydantic_ai()
 # logfire.instrument_system_metrics()
 
 logger.configure(handlers=[logfire.loguru_handler()])
@@ -43,30 +44,28 @@ async def health_check():
 @app.post("/interact", response_model=InteractResponse)
 async def interact(request: InteractRequest):
     """
-    Process an interaction request with mocked logic.
+    Process an interaction request using the Homar AI agent.
     
-    Simulates processing with a 1-second delay.
+    Uses PydanticAI to generate intelligent responses.
     """
     request_id = str(uuid.uuid4())
+    start_time = time.time()
     
     try:
-        return await generate_response(request, request_id)
+        # Generate response using the AI agent
+        ai_response = await run_homar(request.message)
+        
+        processing_time = time.time() - start_time
+        
+        return InteractResponse(
+            message=ai_response,
+            processed_at=datetime.utcnow(),
+            request_id=request_id,
+            processing_time=processing_time
+        )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/")
-async def root():
-    """Root endpoint with basic information."""
-    return {
-        "message": "Welcome to Homarv3 API",
-        "version": "0.1.0",
-        "endpoints": {
-            "health": "/health",
-            "interact": "/interact",
-            "docs": "/docs"
-        }
-    }
 
 if __name__ == "__main__":
     import uvicorn

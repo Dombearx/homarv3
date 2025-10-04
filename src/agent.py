@@ -15,7 +15,7 @@ counter = logfire.metric_counter(
     description='Number of response generations'
 )
 
-@no_auto_trace
+
 async def generate_response(request: InteractRequest, request_id: str) -> InteractResponse:
     """
     Generate a response for an interaction request.
@@ -55,7 +55,7 @@ async def generate_response(request: InteractRequest, request_id: str) -> Intera
     except Exception as e:
         raise Exception(f"Processing failed: {str(e)}")
 
-# @logfire.instrument("Running long running task for request {request_id}")
+@logfire.instrument("Running long running task for request {request_id}")
 async def simulate_long_running_task(request: InteractRequest, request_id: str) -> InteractResponse:
     """
     Simulate a long running task.

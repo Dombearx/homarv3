@@ -12,6 +12,6 @@ POST http://localhost:8000/interact
 Content-Type: application/json
 
 {
-  "message": "Test message with user",
+  "message": "Podaj jedno z moich dzisiejszych zadań",
   "user_id": "user123"
 }

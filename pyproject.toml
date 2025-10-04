@@ -13,6 +13,7 @@ uvicorn = "^0.37.0"
 logfire = {extras = ["fastapi"], version = "^4.10.0"}
 python-dotenv = "^1.1.1"
 loguru = "^0.7.3"
+pydantic-ai = "^1.0.15"
 
 
 [build-system]

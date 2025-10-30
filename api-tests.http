@@ -12,6 +12,11 @@ POST http://localhost:8000/interact
 Content-Type: application/json
 
 {
-  "message": "Podaj jedno z moich dzisiejszych zadań",
+  "message": "Zrób listę zakupów na dzisiaj z podzadaniami: marchew, keczup, makaron",
   "user_id": "user123"
 }
+
+### Home Assistant MCP Server SSE
+GET http://192.168.50.30:8123/mcp_server/sse
+Accept: text/event-stream
+Authorization: Bearer {{$dotenv HOME_ASSISTANT_TOKEN}}

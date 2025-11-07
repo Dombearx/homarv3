@@ -23,7 +23,7 @@ from src.database import db as database_pi
 app = FastAPI(
     title="Homarv3 API",
     version="0.1.0",
-    description="A simple FastAPI application with health and interact endpoints"
+    description="A simple FastAPI application with health and interact endpoints",
 )
 
 logfire.configure(send_to_logfire=True)
@@ -38,33 +38,33 @@ logger.configure(handlers=[logfire.loguru_handler()])
 async def health_check():
     """Health check endpoint."""
     return HealthResponse(
-        status="healthy",
-        timestamp=datetime.utcnow(),
-        version="0.1.0"
+        status="healthy", timestamp=datetime.utcnow(), version="0.1.0"
     )
+
 
 @app.post("/interact", response_model=Message)
 async def interact(request: InteractRequest):
     """
     Process an interaction request using the Homar AI agent.
-    
+
     Uses PydanticAI to generate intelligent responses.
     """
     request_id = str(uuid.uuid4())
     start_time = time.time()
-    
+
     try:
         # Generate response using the AI agent
+        current_chat = database_pi.get_chat(request.chat_id)
         ai_response = await run_homar(request.message.content)
 
         return Message(
             timestamp=datetime.now(timezone.utc),
-            message_id=uuid.uuid4(),
+            message_id=str(uuid.uuid4()),
             chat_id=request.chat_id,
             content=ai_response,
-            role=Role.ASSISTANT
+            role=Role.ASSISTANT,
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -73,6 +73,8 @@ async def interact(request: InteractRequest):
 async def get_chats():
     return database_pi.get_chats()
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8069, reload=True)

@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  homarv3:
+    image: homarv3
+    container_name: homarv3
+    ports:
+      - "8070:8070"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    volumes:
+      - ./.env:/app/.env:ro
+

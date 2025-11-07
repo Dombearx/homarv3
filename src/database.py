@@ -18,6 +18,18 @@ class Database:
         """Return stored chats (empty by default)."""
         return ChatResponse(chats=list(self._chats))
 
+    def get_chat(self, chat_id: str) -> Chat:
+        """Return a chat by its ID."""
+        return next((chat for chat in self._chats if chat.chat_id == chat_id), None)
+
+    def add_message(self, chat_id: str, message: Message) -> None:
+        """Add a message to a chat."""
+        chat = self.get_chat(chat_id)
+        if chat:
+            chat.messages.append(message)
+            chat.last_message_timestamp = message.timestamp
+        else:
+            raise ValueError(f"Chat with ID {chat_id} not found")
 
 # create a module-level instance for easy import/use
 db = Database()
@@ -30,20 +42,68 @@ db._chats = [
         chat_id="chat-1",
         last_message_timestamp=_now,
         messages=[
-            Message(timestamp=_now, message_id="c1-m1", chat_id="chat-1", content="Cześć, czy możesz mi pomóc z pogodą?", role=Role.USER),
-            Message(timestamp=_now, message_id="c1-m2", chat_id="chat-1", content="Oczywiście — jaka lokalizacja Cię interesuje?", role=Role.ASSISTANT),
-            Message(timestamp=_now, message_id="c1-m3", chat_id="chat-1", content="Warszawa, proszę.", role=Role.USER),
+            Message(
+                timestamp=_now,
+                message_id="c1-m1",
+                chat_id="chat-1",
+                content="Cześć, czy możesz mi pomóc z pogodą?",
+                role=Role.USER,
+            ),
+            Message(
+                timestamp=_now,
+                message_id="c1-m2",
+                chat_id="chat-1",
+                content="Oczywiście — jaka lokalizacja Cię interesuje?",
+                role=Role.ASSISTANT,
+            ),
+            Message(
+                timestamp=_now,
+                message_id="c1-m3",
+                chat_id="chat-1",
+                content="Warszawa, proszę.",
+                role=Role.USER,
+            ),
         ],
     ),
     Chat(
         chat_id="chat-2",
         last_message_timestamp=_now,
         messages=[
-            Message(timestamp=_now, message_id="c2-m1", chat_id="chat-2", content="Hej, masz może przepis na risotto?", role=Role.USER),
-            Message(timestamp=_now, message_id="c2-m2", chat_id="chat-2", content="Tak — lubisz grzyby czy wolisz wersję z warzywami?", role=Role.ASSISTANT),
-            Message(timestamp=_now, message_id="c2-m3", chat_id="chat-2", content="Wersję z grzybami.", role=Role.USER),
-            Message(timestamp=_now, message_id="c2-m4", chat_id="chat-2", content="Świetnie — najpierw podsmaż cebulę i czosnek, potem dodaj ryż...", role=Role.ASSISTANT),
-            Message(timestamp=_now, message_id="c2-m5", chat_id="chat-2", content="Dzięki, spróbuję!", role=Role.USER),
+            Message(
+                timestamp=_now,
+                message_id="c2-m1",
+                chat_id="chat-2",
+                content="Hej, masz może przepis na risotto?",
+                role=Role.USER,
+            ),
+            Message(
+                timestamp=_now,
+                message_id="c2-m2",
+                chat_id="chat-2",
+                content="Tak — lubisz grzyby czy wolisz wersję z warzywami?",
+                role=Role.ASSISTANT,
+            ),
+            Message(
+                timestamp=_now,
+                message_id="c2-m3",
+                chat_id="chat-2",
+                content="Wersję z grzybami.",
+                role=Role.USER,
+            ),
+            Message(
+                timestamp=_now,
+                message_id="c2-m4",
+                chat_id="chat-2",
+                content="Świetnie — najpierw podsmaż cebulę i czosnek, potem dodaj ryż...",
+                role=Role.ASSISTANT,
+            ),
+            Message(
+                timestamp=_now,
+                message_id="c2-m5",
+                chat_id="chat-2",
+                content="Dzięki, spróbuję!",
+                role=Role.USER,
+            ),
         ],
     ),
 ]

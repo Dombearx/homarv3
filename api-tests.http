@@ -1,20 +1,27 @@
 ### Homarv3 API Tests
-### Make sure the server is running on http://localhost:8000
-
-### Root endpoint - Get API information
-GET http://localhost:8000/
+### Make sure the server is running on http://localhost:8069
 
 ### Health check endpoint
-GET http://localhost:8000/health
+GET http://localhost:8069/health
 
-### Interact endpoint - With user ID
-POST http://localhost:8000/interact
+### Interact endpoint - With Chat ID
+POST http://192.168.50.30:8070/interact
 Content-Type: application/json
 
 {
-  "message": "Zrób listę zakupów na dzisiaj z podzadaniami: marchew, keczup, makaron",
+  "message": {
+    "timestamp": "2025-11-03T00:00:00Z",
+    "message_id": "msg-1",
+    "chat_id": "chat-1",
+    "content": "Zapisz mi w todo listę zakupów na dzisiaj: marchew, keczup, makaron",
+    "role": "user"
+  },
+  "chat_id": "chat-1",
   "user_id": "user123"
 }
+
+### Get chats
+GET http://localhost:8069/chats
 
 ### Home Assistant MCP Server SSE
 GET http://192.168.50.30:8123/mcp_server/sse

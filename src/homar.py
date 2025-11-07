@@ -1,42 +1,79 @@
-"""
-Simple AI Agent using PydanticAI
-"""
-
 import os
-from pydantic_ai import Agent
+from pydantic_ai import Agent, RunContext
 from pydantic_ai.mcp import MCPServerStreamableHTTP, MCPServerSSE
 import httpx
 import asyncio
 import time
+from dotenv import load_dotenv
 
-todoist_mcp_server = MCPServerStreamableHTTP(
-    "https://ai.todoist.net/mcp",
-    headers={"Authorization": f"Bearer {os.getenv('TODOIST_TOKEN')}"}
-)
-
-home_assistant_mcp_server = MCPServerSSE(
-    "http://192.168.50.30:8123/mcp_server/sse",
-    headers={"Authorization": f"Bearer {os.getenv('HOME_ASSISTANT_TOKEN')}"}
-)
+load_dotenv()
+from src.agents_as_tools.todoist_agent import todoist_agent
+from src.agents_as_tools.home_assistant_agent import home_assistant_agent
 
 homar = Agent(
     "openai:gpt-5-mini",
-    toolsets=[todoist_mcp_server, home_assistant_mcp_server],
-    instructions="You are a helpful AI assistant. Provide clear, concise, and accurate responses. If asked to perform smart home action and no specific device is mentioned, use GetLiveContext tool first to determine available devices."
+    instructions="You are a helpful AI assistant. Provide clear, concise, and accurate responses.",
 )
 
+
+@homar.tool
+async def todoist_api(ctx: RunContext[None], command: str) -> str:
+    """Use this tool to interact with the Todoist API.
+
+    Args:
+        ctx: The run context, including usage metadata.
+        command: The natural language command to execute.
+
+    Returns:
+        The response from the Todoist API as a string.
+    """
+    r = await todoist_agent.run(
+        command,
+        usage=ctx.usage,
+    )
+    return r.output
+
+
+@homar.tool
+async def home_assistant_api(ctx: RunContext[None], command: str) -> str:
+    """Use this tool to interact with the Home Assistant API.
+
+    Args:
+        ctx: The run context, including usage metadata.
+        command: The natural language command to execute.
+
+    Returns:
+        The response from the Home Assistant API as a string.
+    """
+    r = await home_assistant_agent.run(
+        command,
+        usage=ctx.usage,
+    )
+    return r.output
+
+
 @homar.tool_plain
-async def calculate_sum(a: int, b: int) -> int:
+def calculate_sum(a: int, b: int) -> int:
+    """Use this tool to calculate the sum of two integers."""
     return a + b
 
-# TODO Review this concept
-@homar.tool_plain
-async def get_todoist_tools_additional_description() -> str:
-    """Gives additional context for todoist tools"""
-    return "When asked to create a subtasks, first create or get parent task"
+async def run_homar_with_messages(messages: list[ModelMessage]) -> str:
+    agent_response = await homar.run(messages)
+    return agent_response.output
 
 
-async def run_homar(message: str) -> str:    
+async def run_homar(message: str) -> str:
     agent_response = await homar.run(message)
     return agent_response.output
 
+
+from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart
+from pydantic_ai.models.function import AgentInfo, FunctionModel
+def print_schema(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+    tool = info.function_tools[2]
+    print(tool.description)
+    print(tool.parameters_json_schema)
+    return ModelResponse(parts=[TextPart('calculate_sum')])
+
+if __name__ == "__main__":
+    homar.run_sync("hello", model=FunctionModel(print_schema))

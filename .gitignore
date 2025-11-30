@@ -32,3 +32,4 @@ __pycache__/
 
 # Images directory
 images/
+data/chats/*

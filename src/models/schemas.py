@@ -5,6 +5,7 @@ from enum import StrEnum, auto
 from typing import Optional
 
 from pydantic import BaseModel, Field
+from pydantic_ai import ModelMessage
 
 
 class Role(StrEnum):
@@ -13,21 +14,16 @@ class Role(StrEnum):
     USER = auto()
     ASSISTANT = auto()
 
-
 class Message(BaseModel):
-    """Message model."""
-
-    timestamp: datetime
-    message_id: str
-    chat_id: str
-    content: str
-    role: Role
-
-
+    timestamp: datetime = Field(..., description="Timestamp of the message")
+    message_id: str = Field(..., description="Unique identifier for the message")
+    chat_id: str = Field(..., description="Identifier for the chat")
+    content: str = Field(..., description="Content of the message")
+    role: Role = Field(..., description="Role of the message sender")
+    
 class Chat(BaseModel):
     chat_id: str
-    last_message_timestamp: datetime
-    messages: list[Message]
+    messages: list[ModelMessage]
 
 
 class ChatResponse(BaseModel):

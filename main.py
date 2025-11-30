@@ -15,8 +15,8 @@ load_dotenv()
 
 from src.models import InteractRequest, HealthResponse
 from src.models.schemas import ChatResponse, Message, Role
-from src.homar import run_homar
-from src.database import db as database_pi
+from src.homar import run_homar, run_homar_with_history, run_homar_with_messages
+from src.database_json import db_json as database_pi
 
 
 # Create FastAPI app
@@ -46,22 +46,23 @@ async def health_check():
 async def interact(request: InteractRequest):
     """
     Process an interaction request using the Homar AI agent.
-
-    Uses PydanticAI to generate intelligent responses.
     """
     request_id = str(uuid.uuid4())
-    start_time = time.time()
 
     try:
         # Generate response using the AI agent
         current_chat = database_pi.get_chat(request.chat_id)
-        ai_response = await run_homar(request.message.content)
+        current_chat_messages = current_chat.messages if current_chat else []
+        logger.debug(f"Current chat messages: {current_chat_messages}")
+        response_message, new_messages = await run_homar_with_history(new_message=request.message.content, history=current_chat_messages)
+        for message in new_messages:
+            database_pi.add_message(request.chat_id, message)
 
         return Message(
             timestamp=datetime.now(timezone.utc),
             message_id=str(uuid.uuid4()),
             chat_id=request.chat_id,
-            content=ai_response,
+            content=response_message,
             role=Role.ASSISTANT,
         )
 
@@ -77,4 +78,4 @@ async def get_chats():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8069, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8070, reload=True)

@@ -1,6 +1,7 @@
 from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerStreamableHTTP
 import os
+from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 
 todoist_mcp_server = MCPServerStreamableHTTP(
     "https://ai.todoist.net/mcp",
@@ -15,8 +16,14 @@ As a response, summarize what have you done or if action was not possible, expla
 Do not ask follow up questions.
 """
 
+settings = OpenAIResponsesModelSettings(
+    openai_reasoning_effort='minimal',
+    openai_reasoning_summary='concise',
+)
+
 todoist_agent = Agent(
     "openai:gpt-5-mini",
     toolsets=[todoist_mcp_server],
     instructions=TODOIST_AGENT_PROMPT,
+    model_settings=settings,
 )

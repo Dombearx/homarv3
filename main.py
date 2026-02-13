@@ -1,81 +1,153 @@
-#!/usr/bin/env python3
-"""Simple FastAPI application with health and interact endpoints."""
-
-import uuid
-from datetime import datetime, timezone
-import time
-
-from fastapi import FastAPI, HTTPException, Depends
-import logfire
-from dotenv import load_dotenv
+import asyncio
+import os
+import re
+import threading
+import discord
+from discord.ext import commands
+import httpx
 from loguru import logger
-
-load_dotenv()
-# logfire.install_auto_tracing(modules=['src'], min_duration=0)
-
-from src.models import InteractRequest, HealthResponse
-from src.models.schemas import ChatResponse, Message, Role
-from src.homar import run_homar, run_homar_with_history, run_homar_with_messages
-from src.database_json import db_json as database_pi
-
-
-# Create FastAPI app
-app = FastAPI(
-    title="Homarv3 API",
-    version="0.1.0",
-    description="A simple FastAPI application with health and interact endpoints",
+from dotenv import load_dotenv
+import logfire
+import uvicorn
+from src.models.schemas import MyDeps
+from src.agents_as_tools.image_generation_agent import (
+    image_generation_agent,
+    generate_image,
 )
+from src.homar import run_homar_with_history
+import platform
 
 logfire.configure(send_to_logfire=True)
-logfire.instrument_fastapi(app)
 logfire.instrument_pydantic_ai()
-# logfire.instrument_system_metrics()
 
-logger.configure(handlers=[logfire.loguru_handler()])
+def in_wsl():
+    version = platform.release().lower()
+    if "microsoft" in version or "wsl" in version:
+        return True
+
+    try:
+        with open("/proc/version", "rt") as f:
+            return "microsoft" in f.read().lower()
+    except FileNotFoundError:
+        return False
 
 
-@app.get("/health", response_model=HealthResponse)
-async def health_check():
-    """Health check endpoint."""
-    return HealthResponse(
-        status="healthy", timestamp=datetime.utcnow(), version="0.1.0"
+load_dotenv()
+TOKEN = os.getenv("DISCORD_TOKEN")
+
+if not TOKEN:
+    raise RuntimeError("DISCORD_TOKEN is not set in the environment")
+
+intents = discord.Intents.default()
+intents.message_content = True
+intents.messages = True
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+
+def _sanitize_thread_name(s: str, max_len: int = 30) -> str:
+    s = re.sub(r"\s+", " ", (s or "").strip())
+    s = re.sub(r"[^\w\- ,.()]+", "", s)
+    return s[:max_len] or "discussion"
+
+
+async def _get_thread_history(thread: discord.Thread) -> list:
+    """Fetch message history from Discord thread and convert to ModelMessage format."""
+    from pydantic_ai import ModelMessage, TextPart
+    
+    # Fetch last 50 messages from thread
+    messages = []
+    async for msg in thread.history(limit=50):
+        # Skip system messages, include both user and bot messages
+        if msg.type != discord.MessageType.default:
+            continue
+        
+        # Determine role: bot messages are "assistant", user messages are "user"
+        role = "assistant" if msg.author.bot else "user"
+        messages.append(ModelMessage(
+            role=role,
+            content=[TextPart(text=msg.content)]
+        ))
+    
+    # Reverse to get chronological order
+    return list(reversed(messages))
+
+
+@bot.event
+async def on_ready():
+    print(f"{bot.user} has connected to Discord!")
+
+
+@bot.event
+async def on_message(message: discord.Message):
+    if message.author == bot.user:
+        return
+    
+    # if the machine is not wsl and channel is testy - skip
+    if message.channel.name == "testy":
+        if not in_wsl():
+            return
+
+    if message.channel.name == "rpg" or message.channel.name == "rpg2":
+        start_time = asyncio.get_event_loop().time()
+        mode = "horror" if message.channel.name == "rpg2" else "standard"
+        image_description = await image_generation_agent.run(
+            message.content, deps=MyDeps(mode=mode)
+        )
+        image_filename = generate_image(image_description.output, "rpg_scene")
+        logger.info(f"Generated {mode} RPG image: {image_filename}")
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.get(f"http://127.0.0.1:9005/show_image/{image_filename}")
+        except Exception as e:
+            logger.error(f"Failed to display image: {e}")
+        end_time = asyncio.get_event_loop().time()
+        logger.info(
+            f"RPG image generation and display took {end_time - start_time:.2f} seconds."
+        )
+        return
+
+    if isinstance(message.channel, discord.Thread):
+        thread = message.channel
+    else:
+        try:
+            thread_name = _sanitize_thread_name(
+                message.content or f"from {message.author.display_name}"
+            )
+            thread = await message.create_thread(name=thread_name)
+        except Exception:
+            thread = message.channel
+
+    try:
+        async with thread.typing():
+            # Fetch thread history from Discord instead of external database
+            thread_history = await _get_thread_history(thread)
+            response_message, _ = await run_homar_with_history(
+                new_message=message.content, history=thread_history
+            )
+            await thread.send(response_message)
+    except Exception as e:
+        logger.error(f"Error processing message: {e}")
+        try:
+            await thread.send(f"Error getting response: {e}")
+        except Exception as send_error:
+            logger.error(f"Failed to send error message: {send_error}")
+
+
+def run_discord_bot():
+    bot.run(TOKEN)
+
+
+def run_fastapi():
+    uvicorn.run(
+        "src.displayer.main:app",
+        host="0.0.0.0",
+        port=9005,
+        log_level="info",
     )
 
 
-@app.post("/interact", response_model=Message)
-async def interact(request: InteractRequest):
-    """
-    Process an interaction request using the Homar AI agent.
-    """
-    request_id = str(uuid.uuid4())
-
-    try:
-        # Generate response using the AI agent
-        current_chat = database_pi.get_chat(request.chat_id)
-        current_chat_messages = current_chat.messages if current_chat else []
-        logger.debug(f"Current chat messages: {current_chat_messages}")
-        response_message, new_messages = await run_homar_with_history(new_message=request.message.content, history=current_chat_messages)
-        for message in new_messages:
-            database_pi.add_message(request.chat_id, message)
-
-        return Message(
-            timestamp=datetime.now(timezone.utc),
-            message_id=str(uuid.uuid4()),
-            chat_id=request.chat_id,
-            content=response_message,
-            role=Role.ASSISTANT,
-        )
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/chats", response_model=ChatResponse)
-async def get_chats():
-    return database_pi.get_chats()
-
-
 if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8070, reload=True)
+    threading.Thread(target=run_fastapi, daemon=True).start()
+    run_discord_bot()
+    print("Discord bot has stopped running.")

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RPG Media Control</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background-color: black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  #image {
+    max-width: 100%;
+    max-height: 100%;
+  }
+</style>
+</head>
+<body>
+<img id="image" src="" alt="" />
+<audio id="music" loop></audio>
+<audio id="sfx"></audio>
+
+<script>
+const ws = new WebSocket(`ws://${location.host}/ws`);
+const imageEl = document.getElementById("image");
+const musicEl = document.getElementById("music");
+const sfxEl = document.getElementById("sfx");
+
+ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    switch(msg.action) {
+        case "show_image":
+            imageEl.src = msg.file;
+            break;
+        case "play_music":
+            musicEl.src = msg.file;
+            musicEl.play().catch(console.log);
+            break;
+        case "stop_music":
+            musicEl.pause();
+            musicEl.currentTime = 0;
+            break;
+        case "play_sfx":
+            sfxEl.src = msg.file;
+            sfxEl.play().catch(console.log);
+            break;
+    }
+};
+</script>
+</body>
+</html>

@@ -6,6 +6,7 @@ services:
     container_name: homarv3
     ports:
       - "8070:8070"
+      - "9005:9005"
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped

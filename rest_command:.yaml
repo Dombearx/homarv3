@@ -1,0 +1,69 @@
+rest_command:
+  play_music_christmas:
+    url: "http://192.168.50.30:9005/start_random_music/christmas"
+    method: GET
+  play_music_horror:
+    url: "http://192.168.50.30:9005/start_random_music/horror"
+    method: GET
+  stop_music:
+    url: "http://192.168.50.30:9005/stop_random_music"
+    method: GET
+  play_explosion_sfx:
+    url: "http://192.168.50.30:9005/play_sfx/explosion.mp3"
+    method: GET
+  show_black:
+    url: "http://192.168.50.30:9005/show_image/black.png"
+    method: GET
+  show_empty_hall:
+    url: "http://192.168.50.30:9005/show_image/empty_hall.png"
+    method: GET
+  show_victory:
+    url: "http://192.168.50.30:9005/show_image/victory.png"
+    method: GET
+  show_busy_hall:
+    url: "http://192.168.50.30:9005/show_image/busy_hall.png"
+    method: GET
+  show_horror_hall:
+    url: "http://192.168.50.30:9005/show_image/horror_hall.png"
+    method: GET
+  play_rings:
+    url: "http://192.168.50.30:9005/play_music/rings.mp3"
+    method: GET
+
+alias: Show red lights
+description: ""
+triggers:
+  - event_type: timer.finished
+    event_data:
+      entity_id: timer.9_min_timer
+    trigger: event
+actions:
+  - target:
+      entity_id: input_boolean.input_boolean_hue_fade_enabled
+    action: input_boolean.turn_on
+  - target:
+      entity_id: timer.1_min_timer
+    action: timer.start
+
+
+
+
+alias: Explosion
+description: ""
+triggers:
+  - event_type: timer.finished
+    event_data:
+      entity_id: timer.1_min_timer
+    trigger: event
+actions:
+  - data:
+      state: "off"
+    action: input_boolean.input_boolean_hue_fade_enabled
+  - target:
+      entity_id: light.glowne_swiatlo_w_salonie_1
+    action: light.turn_off
+  - target:
+      entity_id: switch.lampki_na_oknie
+    action: switch.turn_off
+  - action: rest_command.play_explosion_sfx
+  - action: rest_command.show_black

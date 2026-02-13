@@ -33,3 +33,14 @@ __pycache__/
 # Images directory
 images/
 data/chats/*
+
+# Ruff
+.ruff_cache/
+
+# data
+data/
+
+# other code
+discord_bot
+main__old.py
+src/displayer/media/*

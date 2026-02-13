@@ -75,7 +75,9 @@ async def _send_message_to_thread(message: str, thread_id: int):
 def _get_actual_message(message: discord.Message, is_delayed_command: bool) -> str:
     """Extract the actual message content, removing delayed command marker if present."""
     if is_delayed_command:
-        return message.content[len(DELAYED_COMMAND_MARKER):].strip()
+        actual_message = message.content[len(DELAYED_COMMAND_MARKER):].strip()
+        logger.info(f"Processing delayed command: {actual_message}")
+        return actual_message
     return message.content
 
 
@@ -157,8 +159,6 @@ async def on_message(message: discord.Message):
         async with thread.typing():
             # Extract the actual message content
             actual_message = _get_actual_message(message, is_delayed_command)
-            if is_delayed_command:
-                logger.info(f"Processing delayed command: {actual_message}")
             
             # Fetch thread history from Discord instead of external database
             thread_history = await _get_thread_history(thread)

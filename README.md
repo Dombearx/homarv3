@@ -1,43 +1,38 @@
-# Homarv3 FastAPI Application
+# Homarv3 Discord Bot
 
-A simple FastAPI application template with health check and interaction endpoints, following Python and FastAPI best practices.
+A Polish-speaking home assistant Discord bot powered by PydanticAI, with integrations for Home Assistant, Todoist, Grocy, and image generation.
 
 ## Features
 
-- **Health Check Endpoint** (`/health`): Returns service status and uptime
-- **Interaction Endpoint** (`/api/v1/interact`): Processes user interactions with mocked logic (1-second delay)
-- **Proper Error Handling**: Custom exceptions and error responses
-- **Request/Response Logging**: Comprehensive logging for debugging
-- **Type Hints**: Full type annotation support
-- **Pydantic Models**: Request/response validation
-- **Configuration Management**: Environment-based configuration
-- **CORS Support**: Configurable CORS middleware
-- **API Documentation**: Auto-generated OpenAPI docs (in debug mode)
+- **Home Assistant Integration**: Control smart home devices (lights, PC, etc.)
+- **Todoist Integration**: Manage tasks, shopping lists, and reminders
+- **Grocy Integration**: Home groceries management
+- **Image Generation**: Generate RPG scene images
+- **Delayed Message Tool**: Schedule commands to be executed after a specified delay (see [docs/DELAYED_MESSAGES.md](docs/DELAYED_MESSAGES.md))
+- **Conversation History**: Maintains context within Discord threads
+- **Multi-Agent Architecture**: Specialized sub-agents for different tasks
 
 ## Project Structure
 
 ```
 homarv3/
 ├── src/
-│   └── homarv3/
-│       ├── api/
-│       │   └── routes.py          # API route definitions
-│       ├── core/
-│       │   ├── config.py          # Configuration management
-│       │   ├── exceptions.py      # Custom exceptions
-│       │   └── logging.py         # Logging configuration
-│       ├── models/
-│       │   └── schemas.py         # Pydantic models
-│       ├── services/
-│       │   └── interaction_service.py  # Business logic
-│       └── main.py                # FastAPI application
-├── tests/
-│   └── test_api.py               # API tests
-├── main.py                       # Entry point
-├── requirements.txt              # Production dependencies
-├── requirements-dev.txt          # Development dependencies
-├── pyproject.toml               # Project configuration
-└── env.example                  # Environment variables example
+│   ├── agents_as_tools/         # Specialized sub-agents
+│   │   ├── todoist_agent.py     # Todoist API integration
+│   │   ├── home_assistant_agent.py  # Home Assistant control
+│   │   ├── grocy_agent.py       # Grocy groceries management
+│   │   └── image_generation_agent.py  # RPG image generation
+│   ├── delayed_message_scheduler.py  # Delayed message scheduling
+│   ├── displayer/               # FastAPI image viewer service
+│   ├── grocy_mcp/              # Grocy MCP server
+│   ├── homar.py                # Main Homar agent
+│   └── models/
+│       └── schemas.py          # Pydantic models
+├── docs/
+│   └── DELAYED_MESSAGES.md     # Delayed message tool documentation
+├── main.py                     # Discord bot entry point
+├── pyproject.toml              # Poetry configuration
+└── Dockerfile                  # Docker configuration
 ```
 
 ## Installation
@@ -48,121 +43,95 @@ homarv3/
    cd homarv3
    ```
 
-2. **Create a virtual environment**:
+2. **Install Poetry** (if not already installed):
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   curl -sSL https://install.python-poetry.org | python3 -
    ```
 
 3. **Install dependencies**:
    ```bash
-   pip install -r requirements.txt
+   poetry install
    ```
 
-4. **For development**:
-   ```bash
-   pip install -r requirements-dev.txt
+4. **Set up environment variables**:
+   Create a `.env` file with the following variables:
    ```
-
-## Configuration
-
-Copy `env.example` to `.env` and modify as needed:
-
-```bash
-cp env.example .env
-```
-
-Available configuration options:
-- `APP_NAME`: Application name
-- `DEBUG`: Enable debug mode
-- `HOST`: Server host
-- `PORT`: Server port
-- `API_PREFIX`: API route prefix
-- `CORS_ORIGINS`: CORS allowed origins
-- `LOG_LEVEL`: Logging level
+   DISCORD_TOKEN=your_discord_bot_token
+   TODOIST_TOKEN=your_todoist_token
+   OPENAI_API_KEY=your_openai_api_key
+   # Add other required tokens
+   ```
 
 ## Running the Application
 
-### Development Mode
+### Using Poetry
+
 ```bash
-python main.py
+poetry run python main.py
 ```
 
-### Production Mode
+This will start both:
+- The Discord bot (connects to Discord)
+- The FastAPI image displayer service (port 9005)
+
+### Using Docker
+
 ```bash
-uvicorn src.homarv3.main:app --host 0.0.0.0 --port 8000
+# Build the image
+make docker_build
+
+# Run with docker-compose
+docker-compose up -d
 ```
 
-The application will be available at:
-- **API**: http://localhost:8000
-- **Health Check**: http://localhost:8000/health
-- **API Documentation**: http://localhost:8000/docs (debug mode only)
+## Usage
 
-## API Endpoints
+The bot responds to messages in Discord channels and threads. It supports:
 
-### Health Check
-- **GET** `/health`
-- Returns service status, timestamp, version, and uptime
+1. **Natural language commands**: Just talk to it naturally in Polish or English
+2. **Home control**: "Włącz światło w sypialni" (Turn on bedroom light)
+3. **Task management**: "Dodaj mleko do listy zakupów" (Add milk to shopping list)
+4. **Delayed actions**: "Wyłącz światło za godzinę" (Turn off light in 1 hour)
+5. **RPG image generation**: In #rpg or #rpg2 channels
 
-### Interaction
-- **POST** `/api/v1/interact`
-- Processes user interactions with mocked logic
-- Request body:
-  ```json
-  {
-    "message": "Your message here",
-    "user_id": "optional_user_id"
-  }
-  ```
-- Response includes processed message, timestamp, request ID, and processing time
-
-## Testing
-
-Run tests with pytest:
-```bash
-pytest
-```
-
-Run tests with coverage:
-```bash
-pytest --cov=src/homarv3
-```
-
-## Code Quality
-
-The project includes several code quality tools:
-
-- **Black**: Code formatting
-- **isort**: Import sorting
-- **flake8**: Linting
-- **mypy**: Type checking
-- **pytest**: Testing
-
-Run all quality checks:
-```bash
-black src/ tests/
-isort src/ tests/
-flake8 src/ tests/
-mypy src/
-pytest
-```
+For more details on the delayed message feature, see [docs/DELAYED_MESSAGES.md](docs/DELAYED_MESSAGES.md).
 
 ## Development
 
-### Adding New Endpoints
+### Code Formatting
 
-1. Add route handlers in `src/homarv3/api/routes.py`
-2. Add Pydantic models in `src/homarv3/models/schemas.py`
-3. Add business logic in `src/homarv3/services/`
-4. Add tests in `tests/test_api.py`
+```bash
+make format
+```
 
-### Error Handling
+This runs `ruff format` on the codebase.
 
-Custom exceptions are defined in `src/homarv3/core/exceptions.py` and automatically handled by FastAPI exception handlers.
+### Adding New Tools
 
-### Logging
+To add a new tool for the Homar agent:
 
-The application uses structured logging. Logs include request/response information and error details.
+1. Define the tool in `src/homar.py` using the `@homar.tool` decorator
+2. Implement the tool function with appropriate parameters and return type
+3. Update the agent instructions if needed
+4. Test the tool by interacting with the bot
+
+Example:
+```python
+@homar.tool
+async def my_new_tool(ctx: RunContext[MyDeps], parameter: str) -> str:
+    """Tool description for the AI to understand when to use it."""
+    # Implementation
+    return "result"
+```
+
+## Architecture Notes
+
+- **PydanticAI**: AI agent framework with tool support
+- **Discord.py**: Discord bot integration
+- **MCP (Model Context Protocol)**: Used for external API integrations
+- **FastMCP**: Toolset for Grocy integration
+- **Logfire**: Observability and logging
+- **asyncio**: Asynchronous task scheduling for delayed messages
 
 ## License
 

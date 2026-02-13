@@ -17,6 +17,24 @@ from src.agents_as_tools.image_generation_agent import image_generation_agent
 from src.delayed_message_scheduler import get_scheduler
 from src.models.schemas import MyDeps
 
+# Constants
+MAX_DELAY_SECONDS = 86400 * 7  # 7 days
+
+
+def _format_delay_seconds(seconds: int) -> str:
+    """Convert seconds to human-readable time format."""
+    if seconds < 60:
+        return f"{seconds} seconds"
+    elif seconds < 3600:
+        return f"{seconds // 60} minutes"
+    else:
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        if minutes:
+            return f"{hours} hours and {minutes} minutes"
+        else:
+            return f"{hours} hours"
+
 
 settings = OpenAIResponsesModelSettings(
     openai_reasoning_effort="low",
@@ -144,8 +162,8 @@ async def send_delayed_message(
     if delay_seconds < 1:
         return "Error: Delay must be at least 1 second"
     
-    if delay_seconds > 86400 * 7:  # 7 days
-        return "Error: Maximum delay is 7 days (604800 seconds)"
+    if delay_seconds > MAX_DELAY_SECONDS:
+        return f"Error: Maximum delay is 7 days ({MAX_DELAY_SECONDS} seconds)"
     
     # Schedule the message
     scheduler = get_scheduler()
@@ -161,18 +179,7 @@ async def send_delayed_message(
             send_callback=deps.send_message_callback
         )
         
-        # Convert seconds to human-readable format
-        if delay_seconds < 60:
-            time_str = f"{delay_seconds} seconds"
-        elif delay_seconds < 3600:
-            time_str = f"{delay_seconds // 60} minutes"
-        else:
-            hours = delay_seconds // 3600
-            minutes = (delay_seconds % 3600) // 60
-            if minutes:
-                time_str = f"{hours} hours and {minutes} minutes"
-            else:
-                time_str = f"{hours} hours"
+        time_str = _format_delay_seconds(delay_seconds)
         
         logger.info(f"Scheduled delayed message {message_id} for {time_str}")
         return f"Scheduled to send '{message}' in {time_str}"

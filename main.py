@@ -57,12 +57,13 @@ def _sanitize_thread_name(s: str, max_len: int = 30) -> str:
 async def _send_message_to_thread(message: str, thread_id: int):
     """Send a message to a Discord thread by ID."""
     try:
-        thread = bot.get_channel(thread_id)
-        if thread is None:
+        channel = bot.get_channel(thread_id)
+        if channel is None:
             # Try to fetch the thread if not in cache
-            thread = await bot.fetch_channel(thread_id)
+            channel = await bot.fetch_channel(thread_id)
         
-        if thread and isinstance(thread, discord.Thread):
+        if channel and isinstance(channel, discord.Thread):
+            thread = channel
             await thread.send(message)
             logger.info(f"Sent delayed message to thread {thread_id}")
         else:

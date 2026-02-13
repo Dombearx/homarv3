@@ -20,6 +20,9 @@ import platform
 logfire.configure(send_to_logfire=True)
 logfire.instrument_pydantic_ai()
 
+# Marker for delayed commands
+DELAYED_COMMAND_MARKER = "[DELAYED_COMMAND]"
+
 def in_wsl():
     version = platform.release().lower()
     if "microsoft" in version or "wsl" in version:
@@ -51,6 +54,23 @@ def _sanitize_thread_name(s: str, max_len: int = 30) -> str:
     return s[:max_len] or "discussion"
 
 
+async def _send_message_to_thread(message: str, thread_id: int):
+    """Send a message to a Discord thread by ID."""
+    try:
+        thread = bot.get_channel(thread_id)
+        if thread is None:
+            # Try to fetch the thread if not in cache
+            thread = await bot.fetch_channel(thread_id)
+        
+        if thread and isinstance(thread, discord.Thread):
+            await thread.send(message)
+            logger.info(f"Sent delayed message to thread {thread_id}")
+        else:
+            logger.error(f"Could not find thread {thread_id} or it's not a Thread object")
+    except Exception as e:
+        logger.error(f"Error sending message to thread {thread_id}: {e}")
+
+
 async def _get_thread_history(thread: discord.Thread) -> list:
     """Fetch message history from Discord thread and convert to ModelMessage format."""
     from pydantic_ai import ModelMessage, TextPart
@@ -80,7 +100,14 @@ async def on_ready():
 
 @bot.event
 async def on_message(message: discord.Message):
-    if message.author == bot.user:
+    # Check if this is a delayed command from the bot itself
+    is_delayed_command = (
+        message.author == bot.user and 
+        message.content.startswith(DELAYED_COMMAND_MARKER)
+    )
+    
+    # Skip regular bot messages but allow delayed commands through
+    if message.author == bot.user and not is_delayed_command:
         return
     
     # if the machine is not wsl and channel is testy - skip
@@ -120,10 +147,24 @@ async def on_message(message: discord.Message):
 
     try:
         async with thread.typing():
+            # If this is a delayed command, extract the actual command
+            if is_delayed_command:
+                actual_message = message.content[len(DELAYED_COMMAND_MARKER):].strip()
+                logger.info(f"Processing delayed command: {actual_message}")
+            else:
+                actual_message = message.content
+            
             # Fetch thread history from Discord instead of external database
             thread_history = await _get_thread_history(thread)
+            
+            # Create deps with thread context for delayed message support
+            deps = MyDeps(
+                thread_id=thread.id,
+                send_message_callback=_send_message_to_thread
+            )
+            
             response_message, _ = await run_homar_with_history(
-                new_message=message.content, history=thread_history
+                new_message=actual_message, history=thread_history, deps=deps
             )
             await thread.send(response_message)
     except Exception as e:

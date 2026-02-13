@@ -1,0 +1,132 @@
+{
+    "6": {
+        "inputs": {
+            "text": "YOUR PROMPT HERE",
+            "clip": [
+                "30",
+                1
+            ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+            "title": "CLIP Text Encode (Positive Prompt)"
+        }
+    },
+    "33": {
+        "inputs": {
+            "text": "photorealistic, photograph, DSLR, camera lens, real world, hyperrealism, low detail, flat lighting, anime, cartoon, chibi, low quality",
+            "clip": [
+                "30",
+                1
+            ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+            "title": "CLIP Text Encode (Negative Prompt)"
+        }
+    },
+    "27": {
+        "inputs": {
+            "width": 1920,
+            "height": 1088,
+            "batch_size": 1
+        },
+        "class_type": "EmptySD3LatentImage",
+        "_meta": {
+            "title": "Empty SD3 Latent (Full HD)"
+        }
+    },
+    "30": {
+        "inputs": {
+            "ckpt_name": "flux1-dev-fp8.safetensors"
+        },
+        "class_type": "CheckpointLoaderSimple",
+        "_meta": {
+            "title": "Load Checkpoint"
+        }
+    },
+    "35": {
+        "inputs": {
+            "guidance": 3.5,
+            "conditioning": [
+                "6",
+                0
+            ]
+        },
+        "class_type": "FluxGuidance",
+        "_meta": {
+            "title": "Flux Guidance"
+        }
+    },
+    "31": {
+        "inputs": {
+            "seed": 243057879077961,
+            "steps": 10,
+            "cfg": 1,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "denoise": 1,
+            "model": [
+                "30",
+                0
+            ],
+            "positive": [
+                "35",
+                0
+            ],
+            "negative": [
+                "33",
+                0
+            ],
+            "latent_image": [
+                "27",
+                0
+            ]
+        },
+        "class_type": "KSampler",
+        "_meta": {
+            "title": "KSampler"
+        }
+    },
+    "8": {
+        "inputs": {
+            "samples": [
+                "31",
+                0
+            ],
+            "vae": [
+                "30",
+                2
+            ]
+        },
+        "class_type": "VAEDecode",
+        "_meta": {
+            "title": "VAE Decode"
+        }
+    },
+    "38": {
+        "inputs": {
+            "images": [
+                "8",
+                0
+            ]
+        },
+        "class_type": "PreviewImage",
+        "_meta": {
+            "title": "Preview Image"
+        }
+    },
+    "40": {
+        "inputs": {
+            "filename_prefix": "ComfyUI_FHD",
+            "images": [
+                "8",
+                0
+            ]
+        },
+        "class_type": "SaveImage",
+        "_meta": {
+            "title": "Save Image"
+        }
+    }
+}

@@ -12,11 +12,12 @@ from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModel
 load_dotenv()
 from src.agents_as_tools.todoist_agent import todoist_agent
 from src.agents_as_tools.home_assistant_agent import home_assistant_agent
+from src.agents_as_tools.image_generation_agent import image_generation_agent
 
 
 settings = OpenAIResponsesModelSettings(
-    openai_reasoning_effort='low',
-    openai_reasoning_summary='concise',
+    openai_reasoning_effort="low",
+    openai_reasoning_summary="concise",
 )
 
 homar = Agent(
@@ -28,7 +29,7 @@ homar = Agent(
 
 @homar.tool
 async def todoist_api(ctx: RunContext[None], command: str) -> str:
-    """Use this tool to interact with the Todoist API - todos, groceries, tasks, things to remember, etc.
+    """Use this tool to interact with the Todoist API - todos, shopping list, tasks, things to remember, etc.
 
     Args:
         ctx: The run context, including usage metadata.
@@ -62,6 +63,45 @@ async def home_assistant_api(ctx: RunContext[None], command: str) -> str:
     return r.output
 
 
+@homar.tool
+async def image_generation_api(ctx: RunContext[None], description: str) -> str:
+    """Use this tool to generate images.
+
+    Args:
+        ctx: The run context, including usage metadata.
+        description: The simple natural language description of image that should contains all imporant details.
+
+    Returns:
+        The filepath of the generted image.
+    """
+    r = await image_generation_agent.run(
+        description,
+        usage=ctx.usage,
+    )
+    return r.output
+
+
+@homar.tool
+async def grocy_api(ctx: RunContext[None], command: str) -> str:
+    """Use this tool to interact with the Grocy API - home groceries management. Allows to add products, check stock, consume stock, open stock, etc.
+    Use whenever user informs about groceries - added to fridge, opened, consumed, etc.
+
+    Args:
+        ctx: The run context, including usage metadata.
+        command: The natural language command to execute.
+
+    Returns:
+        The response from the Grocy API as a string.
+    """
+    from src.agents_as_tools.grocy_agent import grocy_agent
+
+    r = await grocy_agent.run(
+        command,
+        usage=ctx.usage,
+    )
+    return r.output
+
+
 @homar.tool_plain
 def calculate_sum(a: int, b: int) -> int:
     """Use this tool to calculate the sum of two integers."""
@@ -73,11 +113,14 @@ async def run_homar_with_messages(messages: list[ModelMessage]) -> str:
     return agent_response.output, agent_response.new_messages()
 
 
-async def run_homar(message: str) -> str:
+async def run_homar(message: str, channel: str = None) -> str:
     agent_response = await homar.run(message)
     return agent_response.output
 
-async def run_homar_with_history(new_message: str, history: list[ModelMessage]) -> tuple[str, list[ModelMessage]]:
+
+async def run_homar_with_history(
+    new_message: str, history: list[ModelMessage]
+) -> tuple[str, list[ModelMessage]]:
     agent_response = await homar.run(new_message, message_history=history)
     return agent_response.output, agent_response.new_messages()
 

@@ -2,7 +2,6 @@
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional
 from loguru import logger
 
 
@@ -13,7 +12,7 @@ class DelayedMessage:
     message: str
     thread_id: int
     scheduled_time: datetime
-    task: Optional[asyncio.Task] = None
+    task: asyncio.Task | None = None
 
 
 class DelayedMessageScheduler:

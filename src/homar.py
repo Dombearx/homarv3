@@ -25,15 +25,14 @@ def _format_delay_seconds(seconds: int) -> str:
     """Convert seconds to human-readable time format."""
     if seconds < 60:
         return f"{seconds} seconds"
-    elif seconds < 3600:
+    if seconds < 3600:
         return f"{seconds // 60} minutes"
-    else:
-        hours = seconds // 3600
-        minutes = (seconds % 3600) // 60
-        if minutes:
-            return f"{hours} hours and {minutes} minutes"
-        else:
-            return f"{hours} hours"
+    
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    if minutes:
+        return f"{hours} hours and {minutes} minutes"
+    return f"{hours} hours"
 
 
 settings = OpenAIResponsesModelSettings(
@@ -138,16 +137,16 @@ async def send_delayed_message(
 ) -> str:
     """Schedule a message to be sent to yourself in this thread after a specified delay.
     
+    This is NOT a PydanticAI deferred tool - it completes immediately by scheduling a 
+    background asyncio task. The actual delay happens in the background, and when the 
+    time expires, the scheduled message triggers a new agent run in the same thread.
+    
     Use this tool when the user asks you to perform an action after a certain amount of time.
     For example: "turn off the light in 1 hour" or "remind me in 30 minutes".
     
-    The message will be sent back to you in the same Discord thread after the delay,
-    and you will be able to execute the command at that time.
-    
     Args:
-        ctx: The run context with thread information
         message: The message/command to send to yourself after the delay
-        delay_seconds: How many seconds to wait before sending the message
+        delay_seconds: How many seconds to wait before sending the message (1 to 604800)
     
     Returns:
         Confirmation that the message has been scheduled

@@ -56,7 +56,7 @@ class TestDatetimeParsing:
                 break
             except ValueError:
                 continue
-        
+
         assert parsed is not None
         assert parsed.year == 2024
         assert parsed.month == 12
@@ -81,7 +81,7 @@ class TestDatetimeParsing:
                 break
             except ValueError:
                 continue
-        
+
         assert parsed is not None
         assert parsed.year == 2024
         assert parsed.month == 12
@@ -103,7 +103,7 @@ class TestDatetimeParsing:
                 break
             except ValueError:
                 continue
-        
+
         assert parsed is not None
         assert parsed.year == 2024
         assert parsed.month == 12
@@ -127,7 +127,7 @@ class TestDatetimeParsing:
                 break
             except ValueError:
                 continue
-        
+
         assert parsed is not None
         assert parsed.hour == 9
         assert parsed.minute == 0

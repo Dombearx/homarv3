@@ -79,6 +79,7 @@ class DelayedMessageScheduler:
             A unique identifier for this scheduled message
         """
         # Calculate delay in seconds
+        # Note: Using naive datetime (local server time) for consistency
         now = datetime.now()
         delay = (scheduled_time - now).total_seconds()
 

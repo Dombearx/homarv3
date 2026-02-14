@@ -273,6 +273,7 @@ async def send_scheduled_message(
         return f"Error parsing datetime: {str(e)}"
 
     # Validate that the time is in the future
+    # Note: Using naive datetime (local server time) for consistency with scheduled_time
     now = datetime.now()
     if scheduled_time <= now:
         return "Error: Scheduled time must be in the future"

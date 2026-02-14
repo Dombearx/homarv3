@@ -2,6 +2,7 @@
 
 import asyncio
 import pytest
+from datetime import datetime, timedelta
 from src.delayed_message_scheduler import DelayedMessageScheduler
 
 
@@ -129,3 +130,72 @@ class TestDelayedMessageScheduler:
         for message_id, delayed_msg in messages:
             assert isinstance(message_id, str)
             assert delayed_msg.message in ["Test 1", "Test 2"]
+
+    @pytest.mark.asyncio
+    async def test_schedule_message_at(self, scheduler, mock_callback):
+        """Test scheduling a message at a specific datetime."""
+        # Schedule a message 1 second in the future
+        scheduled_time = datetime.now() + timedelta(seconds=1)
+
+        message_id = await scheduler.schedule_message_at(
+            message="Test message",
+            thread_id=123456,
+            scheduled_time=scheduled_time,
+            send_callback=mock_callback,
+        )
+
+        assert message_id.startswith("scheduled_")
+        assert len(scheduler.get_scheduled_messages()) == 1
+
+        # Wait for message to be sent
+        await asyncio.sleep(1.2)
+
+        # Verify callback was called
+        assert len(mock_callback.calls) == 1
+        assert mock_callback.calls[0]["message"] == "Test message"
+        assert mock_callback.calls[0]["thread_id"] == 123456
+
+        # Verify message was removed from scheduler
+        assert len(scheduler.get_scheduled_messages()) == 0
+
+    @pytest.mark.asyncio
+    async def test_schedule_message_at_past_time(self, scheduler, mock_callback):
+        """Test that scheduling a message in the past raises an error."""
+        # Try to schedule a message in the past
+        past_time = datetime.now() - timedelta(seconds=10)
+
+        with pytest.raises(ValueError, match="Scheduled time must be in the future"):
+            await scheduler.schedule_message_at(
+                message="Test message",
+                thread_id=123456,
+                scheduled_time=past_time,
+                send_callback=mock_callback,
+            )
+
+    @pytest.mark.asyncio
+    async def test_schedule_message_at_specific_date(self, scheduler, mock_callback):
+        """Test scheduling a message at a specific date and time."""
+        # Schedule a message 2 seconds in the future with a specific datetime
+        scheduled_time = datetime.now() + timedelta(seconds=2)
+
+        message_id = await scheduler.schedule_message_at(
+            message="Scheduled message",
+            thread_id=999,
+            scheduled_time=scheduled_time,
+            send_callback=mock_callback,
+        )
+
+        assert message_id.startswith("scheduled_")
+
+        # Get the scheduled message and verify its scheduled_time
+        messages = scheduler.get_scheduled_messages()
+        assert len(messages) == 1
+        msg_id, delayed_msg = messages[0]
+        assert delayed_msg.scheduled_time == scheduled_time
+
+        # Wait for message to be sent
+        await asyncio.sleep(2.2)
+
+        # Verify callback was called
+        assert len(mock_callback.calls) == 1
+        assert mock_callback.calls[0]["message"] == "Scheduled message"

@@ -4,6 +4,7 @@ from pydantic_ai.mcp import MCPServerStreamableHTTP, MCPServerSSE
 import httpx
 import asyncio
 import time
+from datetime import datetime
 from dotenv import load_dotenv
 from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
@@ -163,7 +164,11 @@ def calculate_sum(a: int, b: int) -> int:
 
 @homar.tool
 async def send_delayed_message(
-    ctx: RunContext[MyDeps], message: str, delay_seconds: int
+    ctx: RunContext[MyDeps],
+    message: str,
+    hours: int = 0,
+    minutes: int = 0,
+    seconds: int = 0,
 ) -> str:
     """Schedule a message to be sent to yourself in this thread after a specified delay.
 
@@ -176,7 +181,9 @@ async def send_delayed_message(
 
     Args:
         message: The message/command to send to yourself after the delay
-        delay_seconds: How many seconds to wait before sending the message (1 to 604800)
+        hours: Number of hours to wait (0 to 168, default 0)
+        minutes: Number of minutes to wait (0 to 59, default 0)
+        seconds: Number of seconds to wait (0 to 59, default 0)
 
     Returns:
         Confirmation that the message has been scheduled
@@ -187,9 +194,20 @@ async def send_delayed_message(
     if not deps or not deps.thread_id or not deps.send_message_callback:
         return "Error: Cannot schedule delayed message - missing thread context"
 
+    # Validate individual parameters
+    if hours < 0 or hours > 168:
+        return "Error: Hours must be between 0 and 168"
+    if minutes < 0 or minutes > 59:
+        return "Error: Minutes must be between 0 and 59"
+    if seconds < 0 or seconds > 59:
+        return "Error: Seconds must be between 0 and 59"
+
+    # Calculate total delay in seconds
+    delay_seconds = hours * 3600 + minutes * 60 + seconds
+
     # Validate delay
     if delay_seconds < 1:
-        return "Error: Delay must be at least 1 second"
+        return "Error: Delay must be at least 1 second (all time parameters cannot be zero)"
 
     if delay_seconds > MAX_DELAY_SECONDS:
         return f"Error: Maximum delay is 7 days ({MAX_DELAY_SECONDS} seconds)"
@@ -215,6 +233,94 @@ async def send_delayed_message(
 
     except Exception as e:
         logger.error(f"Error scheduling delayed message: {e}")
+        return f"Error scheduling message: {str(e)}"
+
+
+@homar.tool
+async def send_scheduled_message(
+    ctx: RunContext[MyDeps], message: str, scheduled_datetime: str
+) -> str:
+    """Schedule a message to be sent to yourself in this thread at a specific date and time.
+
+    This tool completes immediately by scheduling a background asyncio task. The actual
+    delay happens in the background, and when the scheduled time arrives, the message
+    triggers a new agent run in the same thread.
+
+    Use this tool when the user asks you to perform an action at a specific time or date.
+    For example: "turn off the light at 10pm" or "remind me on December 25th at 9am".
+
+    Args:
+        message: The message/command to send to yourself at the scheduled time
+        scheduled_datetime: ISO 8601 datetime string (e.g., "2024-12-25T09:00:00" or "2024-12-25 09:00:00")
+                           Can also be just date "2024-12-25" (will use 00:00:00 time)
+
+    Returns:
+        Confirmation that the message has been scheduled
+    """
+    deps = ctx.deps
+
+    # Validate that we have the required context
+    if not deps or not deps.thread_id or not deps.send_message_callback:
+        return "Error: Cannot schedule message - missing thread context"
+
+    # Parse the datetime string
+    try:
+        # Try multiple datetime formats
+        scheduled_time = None
+        for fmt in [
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+            "%Y-%m-%dT%H:%M",
+            "%Y-%m-%d",
+        ]:
+            try:
+                scheduled_time = datetime.strptime(scheduled_datetime, fmt)
+                break
+            except ValueError:
+                continue
+
+        if scheduled_time is None:
+            return (
+                "Error: Invalid datetime format. Please use ISO 8601 format like "
+                "'2024-12-25T09:00:00' or '2024-12-25 09:00:00' or just '2024-12-25'"
+            )
+
+    except Exception as e:
+        return f"Error parsing datetime: {str(e)}"
+
+    # Validate that the time is in the future
+    # Note: Using naive datetime (local server time) for consistency with scheduled_time
+    now = datetime.now()
+    if scheduled_time <= now:
+        return "Error: Scheduled time must be in the future"
+
+    # Calculate delay and check maximum
+    delay_seconds = (scheduled_time - now).total_seconds()
+    if delay_seconds > MAX_DELAY_SECONDS:
+        return f"Error: Maximum delay is 7 days ({MAX_DELAY_SECONDS} seconds)"
+
+    # Schedule the message
+    scheduler = get_scheduler()
+
+    # Create a special marker to identify this as a delayed message from the bot
+    marked_message = f"[DELAYED_COMMAND] {message}"
+
+    try:
+        message_id = await scheduler.schedule_message_at(
+            message=marked_message,
+            thread_id=deps.thread_id,
+            scheduled_time=scheduled_time,
+            send_callback=deps.send_message_callback,
+        )
+
+        scheduled_str = scheduled_time.strftime("%Y-%m-%d at %H:%M:%S")
+
+        logger.info(f"Scheduled message {message_id} for {scheduled_str}")
+        return f"Scheduled to send '{message}' on {scheduled_str}"
+
+    except Exception as e:
+        logger.error(f"Error scheduling message: {e}")
         return f"Error scheduling message: {str(e)}"
 
 

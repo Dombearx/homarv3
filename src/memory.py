@@ -1,7 +1,7 @@
 """Memory module for storing and retrieving user preferences using mem0."""
 
-import os
-from typing import Optional
+from __future__ import annotations
+
 from mem0 import Memory
 from loguru import logger
 
@@ -9,8 +9,8 @@ from loguru import logger
 class MemoryManager:
     """Manages user memory storage and retrieval using mem0 with in-memory storage."""
 
-    _instance: Optional["MemoryManager"] = None
-    _memory: Optional[Memory] = None
+    _instance: "MemoryManager" | None = None
+    _memory: Memory | None = None
 
     def __new__(cls):
         """Singleton pattern to ensure only one memory instance."""
@@ -39,7 +39,7 @@ class MemoryManager:
                 "llm": {
                     "provider": "openai",
                     "config": {
-                        "model": "gpt-4o-mini",
+                        "model": "gpt-5-mini",
                         "temperature": 0.1,
                     },
                 },
@@ -111,27 +111,6 @@ class MemoryManager:
 
         except Exception as e:
             logger.error(f"Error searching memories: {e}")
-            return []
-
-    def get_all_memories(self, user_id: str) -> list[dict]:
-        """
-        Get all memories for a user.
-
-        Args:
-            user_id: Unique identifier for the user
-
-        Returns:
-            List of all memories for the user
-        """
-        try:
-            # Get all memories for user
-            memories = self._memory.get_all(user_id=user_id)
-
-            logger.info(f"Retrieved all memories for user {user_id}")
-            return memories if memories else []
-
-        except Exception as e:
-            logger.error(f"Error getting all memories: {e}")
             return []
 
 

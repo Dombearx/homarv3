@@ -325,6 +325,21 @@ async def send_scheduled_message(
         return f"Error scheduling message: {str(e)}"
 
 
+def _format_memory_result(result: dict | str) -> str:
+    """
+    Extract memory text from a result object.
+    
+    Args:
+        result: Memory result from mem0 (can be dict or string)
+    
+    Returns:
+        Formatted memory text string
+    """
+    if isinstance(result, dict):
+        return result.get("memory", result.get("text", str(result)))
+    return str(result)
+
+
 @homar.tool
 async def remember_memory(
     ctx: RunContext[MyDeps], user_preference: str
@@ -378,7 +393,7 @@ async def remember_memory(
 
 @homar.tool
 async def recall_memory(
-    ctx: RunContext[MyDeps], query: str = ""
+    ctx: RunContext[MyDeps], query: str
 ) -> str:
     """Retrieve previously stored user preferences and information from memory.
 
@@ -393,7 +408,7 @@ async def recall_memory(
     - To personalize responses based on user history
     
     Args:
-        query: Optional search query to find specific memories. If empty, returns all memories.
+        query: Search query to find specific memories (required).
 
     Returns:
         Relevant user preferences and information from memory
@@ -404,29 +419,21 @@ async def recall_memory(
         
         memory_manager = get_memory_manager()
         
-        if query:
-            # Search for specific memories
-            results = memory_manager.search_memories(
-                query=query,
-                user_id=user_id,
-                limit=5
-            )
-        else:
-            # Get all memories if no query provided
-            results = memory_manager.get_all_memories(user_id=user_id)
+        # Search for specific memories
+        results = memory_manager.search_memories(
+            query=query,
+            user_id=user_id,
+            limit=5
+        )
         
         if not results:
             return "No memories found for this user."
         
         # Format the results
-        memory_list = []
-        for idx, result in enumerate(results, 1):
-            # Handle different result formats from mem0
-            if isinstance(result, dict):
-                memory_text = result.get("memory", result.get("text", str(result)))
-                memory_list.append(f"{idx}. {memory_text}")
-            else:
-                memory_list.append(f"{idx}. {str(result)}")
+        memory_list = [
+            f"{idx}. {_format_memory_result(result)}"
+            for idx, result in enumerate(results, 1)
+        ]
         
         memories_str = "\n".join(memory_list)
         logger.info(f"Retrieved {len(results)} memories for user {user_id}")

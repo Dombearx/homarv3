@@ -113,35 +113,6 @@ class TestMemoryManager:
         
         assert results == []
 
-    def test_get_all_memories_success(self, memory_manager, mock_mem0):
-        """Test successful retrieval of all memories."""
-        mock_mem0.get_all.return_value = [
-            {"memory": "Memory 1"},
-            {"memory": "Memory 2"},
-            {"memory": "Memory 3"}
-        ]
-        
-        results = memory_manager.get_all_memories(user_id="user_123")
-        
-        assert len(results) == 3
-        mock_mem0.get_all.assert_called_once_with(user_id="user_123")
-
-    def test_get_all_memories_empty(self, memory_manager, mock_mem0):
-        """Test get_all_memories with no results."""
-        mock_mem0.get_all.return_value = None
-        
-        results = memory_manager.get_all_memories(user_id="user_123")
-        
-        assert results == []
-
-    def test_get_all_memories_error(self, memory_manager, mock_mem0):
-        """Test error handling in get_all_memories."""
-        mock_mem0.get_all.side_effect = Exception("Database error")
-        
-        results = memory_manager.get_all_memories(user_id="user_123")
-        
-        assert results == []
-
 
 class TestGetMemoryManager:
     """Test the get_memory_manager function."""

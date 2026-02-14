@@ -125,7 +125,6 @@ async def github_issue_api(ctx: RunContext[MyDeps], description: str) -> str:
     This tool helps create high-quality, detailed, and well-structured GitHub issues for bug reports, feature requests, or any other repository issues.
 
     Args:
-        ctx: The run context, including usage metadata.
         description: The description of the issue to create (can be brief - the agent will expand it into a detailed issue).
 
     Returns:

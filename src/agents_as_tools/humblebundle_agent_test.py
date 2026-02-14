@@ -8,7 +8,7 @@ from src.agents_as_tools.humblebundle_agent import (
     _get_category,
     _find_matching_url,
     _extract_bundle_metadata,
-    _check_for_pricing_tiers,
+    _format_bundle_list,
 )
 
 
@@ -78,6 +78,66 @@ class TestListBundles:
         result = list_bundles()
         
         assert "Error" in result
+
+    @patch('src.agents_as_tools.humblebundle_agent.httpx.get')
+    def test_list_bundles_filter_by_games(self, mock_get):
+        """Test filtering bundles by games type."""
+        mock_html = '''
+        <html>
+        <body>
+        <script>
+        var data = {
+            "tile_name": "Humble Game Bundle: Test Games",
+            "product_url": "/games/test-games"
+        };
+        var data2 = {
+            "tile_name": "Humble Book Bundle: Test Books",
+            "product_url": "/books/test-books"
+        };
+        </script>
+        </body>
+        </html>
+        '''
+        
+        mock_response = Mock()
+        mock_response.text = mock_html
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+        
+        result = list_bundles(bundle_type="games")
+        
+        assert "Humble Game Bundle: Test Games" in result
+        assert "Humble Book Bundle: Test Books" not in result
+
+    @patch('src.agents_as_tools.humblebundle_agent.httpx.get')
+    def test_list_bundles_filter_by_books(self, mock_get):
+        """Test filtering bundles by books type."""
+        mock_html = '''
+        <html>
+        <body>
+        <script>
+        var data = {
+            "tile_name": "Humble Game Bundle: Test Games",
+            "product_url": "/games/test-games"
+        };
+        var data2 = {
+            "tile_name": "Humble Book Bundle: Test Books",
+            "product_url": "/books/test-books"
+        };
+        </script>
+        </body>
+        </html>
+        '''
+        
+        mock_response = Mock()
+        mock_response.text = mock_html
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+        
+        result = list_bundles(bundle_type="books")
+        
+        assert "Humble Book Bundle: Test Books" in result
+        assert "Humble Game Bundle: Test Games" not in result
 
 
 class TestGetBundleDetails:
@@ -256,33 +316,47 @@ class TestExtractBundleMetadata:
         assert result["description"] == "No description available"
 
 
-class TestCheckForPricingTiers:
-    """Test the _check_for_pricing_tiers helper function."""
+class TestFormatBundleList:
+    """Test the _format_bundle_list helper function."""
 
-    def test_check_for_pricing_tiers_found(self):
-        """Test when pricing tiers are found in HTML."""
-        html = '''
-        <html>
-        <body>
-        <script>
-        var data = {"tiers": [{"price": 1}, {"price": 10}]};
-        </script>
-        </body>
-        </html>
-        '''
-        result = _check_for_pricing_tiers(html)
-        assert "Price Tiers" in result
-        assert len(result) > 0
+    def test_format_bundle_list_single(self):
+        """Test formatting a single bundle."""
+        bundles = [
+            {
+                "name": "Test Bundle",
+                "category": "games",
+                "url": "https://www.humblebundle.com/games/test"
+            }
+        ]
+        result = _format_bundle_list(bundles)
+        assert "Found 1 active bundles" in result
+        assert "Test Bundle" in result
+        assert "games" in result
+        assert "https://www.humblebundle.com/games/test" in result
 
-    def test_check_for_pricing_tiers_not_found(self):
-        """Test when pricing tiers are not found."""
-        html = "<html><body></body></html>"
-        result = _check_for_pricing_tiers(html)
-        assert result == ""
+    def test_format_bundle_list_multiple(self):
+        """Test formatting multiple bundles."""
+        bundles = [
+            {
+                "name": "Game Bundle",
+                "category": "games",
+                "url": "https://www.humblebundle.com/games/test1"
+            },
+            {
+                "name": "Book Bundle",
+                "category": "books",
+                "url": "https://www.humblebundle.com/books/test2"
+            }
+        ]
+        result = _format_bundle_list(bundles)
+        assert "Found 2 active bundles" in result
+        assert "Game Bundle" in result
+        assert "Book Bundle" in result
+        assert "games" in result
+        assert "books" in result
 
-    def test_check_for_pricing_tiers_malformed_html(self):
-        """Test with malformed HTML doesn't crash."""
-        html = "<html><body><<invalid"
-        result = _check_for_pricing_tiers(html)
-        # Should return empty string, not crash
-        assert isinstance(result, str)
+    def test_format_bundle_list_empty(self):
+        """Test formatting empty bundle list."""
+        bundles = []
+        result = _format_bundle_list(bundles)
+        assert "Found 0 active bundles" in result

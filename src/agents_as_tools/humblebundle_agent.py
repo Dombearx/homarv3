@@ -65,9 +65,9 @@ def _get_category(product_url: str) -> str:
     """
     if "/books/" in product_url:
         return "books"
-    elif "/games/" in product_url:
+    if "/games/" in product_url:
         return "games"
-    elif "/software/" in product_url:
+    if "/software/" in product_url:
         return "software"
     return "bundle"
 
@@ -114,30 +114,31 @@ def _extract_bundle_metadata(html: str, bundle_name: str) -> dict:
     return {"title": title, "description": description}
 
 
-def _check_for_pricing_tiers(html: str) -> str:
+def _format_bundle_list(bundles: list[dict]) -> str:
     """
-    Check if bundle has pricing tier information.
+    Format a list of bundles into a human-readable string.
     
     Args:
-        html: The HTML content of the bundle page
+        bundles: List of bundle dictionaries with 'name', 'category', and 'url' keys
         
     Returns:
-        String with pricing tier info or empty string
+        Formatted string with bundle information
     """
-    try:
-        pricing_pattern = r'"tiers":\s*\[(.*?)\]'
-        pricing_match = re.search(pricing_pattern, html, re.DOTALL)
-        if pricing_match:
-            return "\n\nPrice Tiers: Check the bundle page for current pricing tiers."
-    except Exception:
-        pass
-    return ""
+    result = f"Found {len(bundles)} active bundles:\n\n"
+    for bundle in bundles:
+        result += f"• {bundle['name']}\n"
+        result += f"  Type: {bundle['category']}\n"
+        result += f"  Link: {bundle['url']}\n\n"
+    return result
 
 
 @humblebundle_agent.tool_plain
-def list_bundles() -> str:
+def list_bundles(bundle_type: str = "all") -> str:
     """
-    List all currently available bundles from HumbleBundle.com.
+    List currently available bundles from HumbleBundle.com.
+    
+    Args:
+        bundle_type: Type of bundles to list: "all", "games", "books", or "software"
     
     Returns:
         A formatted string with bundle information including name, type, and link.
@@ -175,6 +176,10 @@ def list_bundles() -> str:
                 # Determine category from URL
                 category = _get_category(product_url)
                 
+                # Filter by bundle type if specified
+                if bundle_type != "all" and category != bundle_type:
+                    continue
+                
                 bundles.append({
                     "name": tile_name,
                     "category": category,
@@ -185,13 +190,7 @@ def list_bundles() -> str:
             return "No bundles found at this time. Please try again later or visit https://www.humblebundle.com/bundles directly."
         
         # Format the output
-        result = f"Found {len(bundles)} active bundles:\n\n"
-        for bundle in bundles:
-            result += f"• {bundle['name']}\n"
-            result += f"  Type: {bundle['category']}\n"
-            result += f"  Link: {bundle['url']}\n\n"
-        
-        return result
+        return _format_bundle_list(bundles)
         
     except httpx.HTTPError as e:
         logger.error(f"HTTP error fetching bundles: {e}")
@@ -239,15 +238,11 @@ def get_bundle_details(bundle_name: str) -> str:
         # Extract metadata
         metadata = _extract_bundle_metadata(html, bundle_name)
         
-        # Check for pricing tiers
-        tier_info = _check_for_pricing_tiers(html)
-        
         # Format result
         result = f"Bundle Details:\n\n"
         result += f"Name: {metadata['title']}\n"
         result += f"Link: {matching_url}\n"
         result += f"Description: {metadata['description']}\n"
-        result += tier_info
         result += f"\n\nVisit the link for full details, pricing, and to purchase."
         
         return result

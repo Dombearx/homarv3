@@ -130,7 +130,6 @@ async def google_calendar_api(ctx: RunContext[MyDeps], command: str) -> str:
     Use whenever user asks about calendar, schedule, events, appointments, or wants to create/check/modify calendar entries.
 
     Args:
-        ctx: The run context, including usage metadata.
         command: The natural language command to execute.
 
     Returns:

@@ -37,6 +37,12 @@ data/chats/*
 # Ruff
 .ruff_cache/
 
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
 # data
 data/
 

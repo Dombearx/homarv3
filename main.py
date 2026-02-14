@@ -23,6 +23,7 @@ logfire.instrument_pydantic_ai()
 # Marker for delayed commands
 DELAYED_COMMAND_MARKER = "[DELAYED_COMMAND]"
 
+
 def in_wsl():
     version = platform.release().lower()
     if "microsoft" in version or "wsl" in version:
@@ -61,13 +62,15 @@ async def _send_message_to_thread(message: str, thread_id: int):
         if channel is None:
             # Try to fetch the thread if not in cache
             channel = await bot.fetch_channel(thread_id)
-        
+
         if channel and isinstance(channel, discord.Thread):
             thread = channel
             await thread.send(message)
             logger.info(f"Sent delayed message to thread {thread_id}")
         else:
-            logger.error(f"Could not find thread {thread_id} or it's not a Thread object")
+            logger.error(
+                f"Could not find thread {thread_id} or it's not a Thread object"
+            )
     except Exception as e:
         logger.error(f"Error sending message to thread {thread_id}: {e}")
 
@@ -75,7 +78,7 @@ async def _send_message_to_thread(message: str, thread_id: int):
 def _get_actual_message(message: discord.Message, is_delayed_command: bool) -> str:
     """Extract the actual message content, removing delayed command marker if present."""
     if is_delayed_command:
-        actual_message = message.content[len(DELAYED_COMMAND_MARKER):].strip()
+        actual_message = message.content[len(DELAYED_COMMAND_MARKER) :].strip()
         logger.info(f"Processing delayed command: {actual_message}")
         return actual_message
     return message.content
@@ -84,21 +87,18 @@ def _get_actual_message(message: discord.Message, is_delayed_command: bool) -> s
 async def _get_thread_history(thread: discord.Thread) -> list:
     """Fetch message history from Discord thread and convert to ModelMessage format."""
     from pydantic_ai import ModelMessage, TextPart
-    
+
     # Fetch last 50 messages from thread
     messages = []
     async for msg in thread.history(limit=50):
         # Skip system messages, include both user and bot messages
         if msg.type != discord.MessageType.default:
             continue
-        
+
         # Determine role: bot messages are "assistant", user messages are "user"
         role = "assistant" if msg.author.bot else "user"
-        messages.append(ModelMessage(
-            role=role,
-            content=[TextPart(text=msg.content)]
-        ))
-    
+        messages.append(ModelMessage(role=role, content=[TextPart(text=msg.content)]))
+
     # Reverse to get chronological order
     return list(reversed(messages))
 
@@ -111,15 +111,14 @@ async def on_ready():
 @bot.event
 async def on_message(message: discord.Message):
     # Check if this is a delayed command from the bot itself
-    is_delayed_command = (
-        message.author == bot.user and 
-        message.content.startswith(DELAYED_COMMAND_MARKER)
+    is_delayed_command = message.author == bot.user and message.content.startswith(
+        DELAYED_COMMAND_MARKER
     )
-    
+
     # Skip regular bot messages but allow delayed commands through
     if message.author == bot.user and not is_delayed_command:
         return
-    
+
     # if the machine is not wsl and channel is testy - skip
     if message.channel.name == "testy":
         if not in_wsl():
@@ -159,16 +158,15 @@ async def on_message(message: discord.Message):
         async with thread.typing():
             # Extract the actual message content
             actual_message = _get_actual_message(message, is_delayed_command)
-            
+
             # Fetch thread history from Discord instead of external database
             thread_history = await _get_thread_history(thread)
-            
+
             # Create deps with thread context for delayed message support
             deps = MyDeps(
-                thread_id=thread.id,
-                send_message_callback=_send_message_to_thread
+                thread_id=thread.id, send_message_callback=_send_message_to_thread
             )
-            
+
             response_message, _ = await run_homar_with_history(
                 new_message=actual_message, history=thread_history, deps=deps
             )

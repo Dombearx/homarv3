@@ -35,4 +35,4 @@ todoist_agent = Agent(
 
 @todoist_agent.instructions
 def add_current_date() -> str:
-    return f'Today is {date.today()}.'
+    return f"Today is {date.today()}."

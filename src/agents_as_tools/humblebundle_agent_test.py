@@ -41,7 +41,7 @@ class TestListBundles:
         assert "Humble Game Bundle: Test Games" in result
         assert "Humble Book Bundle: Test Books" in result
         assert "https://www.humblebundle.com" in result
-        assert "games" in result or "books" in result
+        assert "games" in result and "books" in result
 
     @patch('src.agents_as_tools.humblebundle_agent.httpx.get')
     def test_list_bundles_no_bundles(self, mock_get):

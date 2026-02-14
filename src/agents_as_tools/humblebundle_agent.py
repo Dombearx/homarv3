@@ -202,7 +202,7 @@ def get_bundle_details(bundle_name: str) -> str:
             pricing_match = re.search(pricing_pattern, html, re.DOTALL)
             if pricing_match:
                 tier_info = "\n\nPrice Tiers: Check the bundle page for current pricing tiers."
-        except:
+        except Exception:
             pass
         
         result = f"Bundle Details:\n\n"

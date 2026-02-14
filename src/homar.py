@@ -16,6 +16,7 @@ from src.agents_as_tools.todoist_agent import todoist_agent
 from src.agents_as_tools.home_assistant_agent import home_assistant_agent
 from src.agents_as_tools.image_generation_agent import image_generation_agent
 from src.agents_as_tools.google_calendar_agent import google_calendar_agent
+from src.agents_as_tools.humblebundle_agent import humblebundle_agent
 from src.delayed_message_scheduler import get_scheduler
 from src.models.schemas import MyDeps
 
@@ -150,6 +151,25 @@ async def google_calendar_api(ctx: RunContext[MyDeps], command: str) -> str:
         The response from the Google Calendar API as a string.
     """
     r = await google_calendar_agent.run(
+        command,
+        usage=ctx.usage,
+    )
+    return r.output
+
+
+@homar.tool
+async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
+    """Use this tool to check HumbleBundle deals and bundles.
+    Use when user asks about HumbleBundle, game bundles, book bundles, software bundles, or current deals on HumbleBundle.
+    Can list available bundles or get details about specific bundles.
+
+    Args:
+        command: The natural language command to execute (e.g., "list all bundles", "show me game bundles", "details about book bundle").
+
+    Returns:
+        Information about HumbleBundle bundles as a string.
+    """
+    r = await humblebundle_agent.run(
         command,
         usage=ctx.usage,
     )

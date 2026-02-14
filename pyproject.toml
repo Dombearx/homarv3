@@ -24,7 +24,7 @@ PyGithub = "^2.5.0"
 
 [tool.poetry.group.dev.dependencies]
 jupyter = "^1.1.1"
-otebook = "^7.4.7"
+notebook = "^7.4.7"
 pytest = "^8.3.4"
 pytest-asyncio = "^0.25.2"
 pytest-mock = "^3.14.0"

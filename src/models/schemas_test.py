@@ -1,4 +1,5 @@
 """Unit tests for models/schemas.py module."""
+
 import pytest
 from src.models.schemas import MyDeps, Role, InteractRequest, HealthResponse
 from datetime import datetime
@@ -30,15 +31,12 @@ class TestMyDeps:
 
     def test_my_deps_with_values(self):
         """Test MyDeps with custom values."""
+
         async def callback(msg, thread_id):
             pass
-        
-        deps = MyDeps(
-            mode="horror",
-            thread_id=12345,
-            send_message_callback=callback
-        )
-        
+
+        deps = MyDeps(mode="horror", thread_id=12345, send_message_callback=callback)
+
         assert deps.mode == "horror"
         assert deps.thread_id == 12345
         assert deps.send_message_callback == callback
@@ -78,12 +76,8 @@ class TestHealthResponse:
     def test_health_response_creation(self):
         """Test creating HealthResponse."""
         now = datetime.now()
-        response = HealthResponse(
-            status="healthy",
-            timestamp=now,
-            version="0.1.0"
-        )
-        
+        response = HealthResponse(status="healthy", timestamp=now, version="0.1.0")
+
         assert response.status == "healthy"
         assert response.timestamp == now
         assert response.version == "0.1.0"

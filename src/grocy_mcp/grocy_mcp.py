@@ -55,6 +55,7 @@ def get_product(product_name: str) -> int:
 
 mcp = FastMCP("Grocy MCP Server")
 
+
 @mcp.tool()
 def create_product(args: CreateProductInput) -> str:
     """

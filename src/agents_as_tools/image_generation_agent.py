@@ -20,7 +20,9 @@ from src.agents_as_tools.prompts import (
 load_dotenv()
 runpod.api_key = os.getenv("RUNPOD_API_KEY")
 endpoint = runpod.Endpoint(os.getenv("RUNPOD_ENDPOINT_ID", "gl0xwrlwmcvvop"))
-upscale_endpoint = runpod.Endpoint(os.getenv("RUNPOD_UPSCALE_ENDPOINT_ID", "y8p20zdf2aoubp"))
+upscale_endpoint = runpod.Endpoint(
+    os.getenv("RUNPOD_UPSCALE_ENDPOINT_ID", "y8p20zdf2aoubp")
+)
 
 
 IMAGE_GENERATION_AGENT_PROMPT = """

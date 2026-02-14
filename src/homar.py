@@ -27,7 +27,7 @@ def _format_delay_seconds(seconds: int) -> str:
         return f"{seconds} seconds"
     if seconds < 3600:
         return f"{seconds // 60} minutes"
-    
+
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     if minutes:
@@ -131,64 +131,64 @@ def calculate_sum(a: int, b: int) -> int:
 
 @homar.tool
 async def send_delayed_message(
-    ctx: RunContext[MyDeps], 
-    message: str, 
-    delay_seconds: int
+    ctx: RunContext[MyDeps], message: str, delay_seconds: int
 ) -> str:
     """Schedule a message to be sent to yourself in this thread after a specified delay.
-    
-    This is NOT a PydanticAI deferred tool - it completes immediately by scheduling a 
-    background asyncio task. The actual delay happens in the background, and when the 
+
+    This is NOT a PydanticAI deferred tool - it completes immediately by scheduling a
+    background asyncio task. The actual delay happens in the background, and when the
     time expires, the scheduled message triggers a new agent run in the same thread.
-    
+
     Use this tool when the user asks you to perform an action after a certain amount of time.
     For example: "turn off the light in 1 hour" or "remind me in 30 minutes".
-    
+
     Args:
         message: The message/command to send to yourself after the delay
         delay_seconds: How many seconds to wait before sending the message (1 to 604800)
-    
+
     Returns:
         Confirmation that the message has been scheduled
     """
     deps = ctx.deps
-    
+
     # Validate that we have the required context
     if not deps or not deps.thread_id or not deps.send_message_callback:
         return "Error: Cannot schedule delayed message - missing thread context"
-    
+
     # Validate delay
     if delay_seconds < 1:
         return "Error: Delay must be at least 1 second"
-    
+
     if delay_seconds > MAX_DELAY_SECONDS:
         return f"Error: Maximum delay is 7 days ({MAX_DELAY_SECONDS} seconds)"
-    
+
     # Schedule the message
     scheduler = get_scheduler()
-    
+
     # Create a special marker to identify this as a delayed message from the bot
     marked_message = f"[DELAYED_COMMAND] {message}"
-    
+
     try:
         message_id = await scheduler.schedule_message(
             message=marked_message,
             thread_id=deps.thread_id,
             delay_seconds=delay_seconds,
-            send_callback=deps.send_message_callback
+            send_callback=deps.send_message_callback,
         )
-        
+
         time_str = _format_delay_seconds(delay_seconds)
-        
+
         logger.info(f"Scheduled delayed message {message_id} for {time_str}")
         return f"Scheduled to send '{message}' in {time_str}"
-        
+
     except Exception as e:
         logger.error(f"Error scheduling delayed message: {e}")
         return f"Error scheduling message: {str(e)}"
 
 
-async def run_homar_with_messages(messages: list[ModelMessage], deps: MyDeps = None) -> str:
+async def run_homar_with_messages(
+    messages: list[ModelMessage], deps: MyDeps = None
+) -> str:
     if deps is None:
         deps = MyDeps()
     agent_response = await homar.run(messages, deps=deps)

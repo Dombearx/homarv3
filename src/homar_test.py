@@ -1,4 +1,5 @@
 """Unit tests for homar.py module."""
+
 import pytest
 from src.homar import _format_delay_seconds
 
@@ -28,6 +29,8 @@ class TestFormatDelaySeconds:
     def test_format_hours_and_minutes(self):
         """Test formatting delays with both hours and minutes."""
         assert _format_delay_seconds(3660) == "1 hours and 1 minutes"
-        assert _format_delay_seconds(7200) == "2 hours"  # Exact 2 hours, no minutes shown
+        assert (
+            _format_delay_seconds(7200) == "2 hours"
+        )  # Exact 2 hours, no minutes shown
         assert _format_delay_seconds(5400) == "1 hours and 30 minutes"
         assert _format_delay_seconds(9000) == "2 hours and 30 minutes"

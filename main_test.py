@@ -1,4 +1,5 @@
 """Unit tests for main.py utility functions."""
+
 import pytest
 from unittest.mock import Mock
 
@@ -65,7 +66,7 @@ class TestGetActualMessage:
         """Test getting message content from regular message."""
         mock_message = Mock()
         mock_message.content = "Hello, world!"
-        
+
         result = _get_actual_message(mock_message, is_delayed_command=False)
         assert result == "Hello, world!"
 
@@ -73,7 +74,7 @@ class TestGetActualMessage:
         """Test getting message content from delayed command."""
         mock_message = Mock()
         mock_message.content = f"{DELAYED_COMMAND_MARKER} Turn off the lights"
-        
+
         result = _get_actual_message(mock_message, is_delayed_command=True)
         assert result == "Turn off the lights"
 
@@ -81,14 +82,16 @@ class TestGetActualMessage:
         """Test delayed message strips extra spaces."""
         mock_message = Mock()
         mock_message.content = f"{DELAYED_COMMAND_MARKER}   Turn off the lights   "
-        
+
         result = _get_actual_message(mock_message, is_delayed_command=True)
         assert result == "Turn off the lights"
 
     def test_get_actual_message_delayed_multiword(self):
         """Test delayed message with complex content."""
         mock_message = Mock()
-        mock_message.content = f"{DELAYED_COMMAND_MARKER} This is a complex message with many words"
-        
+        mock_message.content = (
+            f"{DELAYED_COMMAND_MARKER} This is a complex message with many words"
+        )
+
         result = _get_actual_message(mock_message, is_delayed_command=True)
         assert result == "This is a complex message with many words"

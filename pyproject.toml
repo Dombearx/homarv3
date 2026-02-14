@@ -20,11 +20,11 @@ runpod = "^1.8.1"
 websockets = "^15.0.1"
 fastmcp = "^2.14.2"
 pydantic-ai-slim = {extras = ["fastmcp"], version = "^1.39.0"}
-pygithub = "^2.5.0"
+PyGithub = "^2.5.0"
 
 [tool.poetry.group.dev.dependencies]
 jupyter = "^1.1.1"
-notebook = "^7.4.7"
+otebook = "^7.4.7"
 pytest = "^8.3.4"
 pytest-asyncio = "^0.25.2"
 pytest-mock = "^3.14.0"

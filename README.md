@@ -80,7 +80,9 @@ homarv3/
       - Go to "APIs & Services" > "OAuth consent screen"
       - Choose "External" and click "Create"
       - Fill in the required fields (App name, User support email, Developer contact)
-      - Add the scope: `https://www.googleapis.com/auth/calendar.events`
+      - Add the scopes:
+        - `https://www.googleapis.com/auth/calendar.readonly`
+        - `https://www.googleapis.com/auth/calendar.events`
       - Add test users if needed
    
    e. Create OAuth credentials:

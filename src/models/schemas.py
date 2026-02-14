@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum, auto
-from typing import Optional
+from typing import Optional, Any
 
 from pydantic import BaseModel, Field
 from pydantic_ai import ModelMessage
@@ -36,6 +36,5 @@ class MyDeps:
     """Dependencies for agents."""
 
     mode: str = "standard"
-@dataclass
-class MyDeps:
-    mode: str
+    thread_id: Optional[int] = None
+    send_message_callback: Optional[Any] = None

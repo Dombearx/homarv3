@@ -2,7 +2,14 @@
 
 import pytest
 from unittest.mock import Mock, patch
-from src.agents_as_tools.humblebundle_agent import list_bundles, get_bundle_details
+from src.agents_as_tools.humblebundle_agent import (
+    list_bundles,
+    get_bundle_details,
+    _get_category,
+    _find_matching_url,
+    _extract_bundle_metadata,
+    _check_for_pricing_tiers,
+)
 
 
 class TestListBundles:
@@ -131,3 +138,151 @@ class TestGetBundleDetails:
         result = get_bundle_details("test")
         
         assert "Error" in result
+
+
+class TestGetCategory:
+    """Test the _get_category helper function."""
+
+    def test_get_category_books(self):
+        """Test category detection for books."""
+        assert _get_category("/books/example-bundle") == "books"
+
+    def test_get_category_games(self):
+        """Test category detection for games."""
+        assert _get_category("/games/example-bundle") == "games"
+
+    def test_get_category_software(self):
+        """Test category detection for software."""
+        assert _get_category("/software/example-bundle") == "software"
+
+    def test_get_category_default(self):
+        """Test default category for other bundle types."""
+        assert _get_category("/bundles/example-bundle") == "bundle"
+        assert _get_category("/other/example") == "bundle"
+
+
+class TestFindMatchingUrl:
+    """Test the _find_matching_url helper function."""
+
+    def test_find_matching_url_exact_match(self):
+        """Test finding URL with exact name match."""
+        urls = [
+            "https://www.humblebundle.com/games/test-bundle",
+            "https://www.humblebundle.com/books/other-bundle",
+        ]
+        result = _find_matching_url("test", urls)
+        assert result == "https://www.humblebundle.com/games/test-bundle"
+
+    def test_find_matching_url_partial_match(self):
+        """Test finding URL with partial name match."""
+        urls = [
+            "https://www.humblebundle.com/games/awesome-rpg-bundle",
+            "https://www.humblebundle.com/books/python-books",
+        ]
+        result = _find_matching_url("rpg", urls)
+        assert result == "https://www.humblebundle.com/games/awesome-rpg-bundle"
+
+    def test_find_matching_url_word_match(self):
+        """Test finding URL with word-based matching."""
+        urls = [
+            "https://www.humblebundle.com/games/fallout-tabletop",
+            "https://www.humblebundle.com/books/programming",
+        ]
+        result = _find_matching_url("fallout", urls)
+        assert result == "https://www.humblebundle.com/games/fallout-tabletop"
+
+    def test_find_matching_url_not_found(self):
+        """Test when no matching URL is found."""
+        urls = [
+            "https://www.humblebundle.com/games/test-bundle",
+        ]
+        result = _find_matching_url("nonexistent", urls)
+        assert result is None
+
+    def test_find_matching_url_empty_list(self):
+        """Test with empty URL list."""
+        result = _find_matching_url("test", [])
+        assert result is None
+
+
+class TestExtractBundleMetadata:
+    """Test the _extract_bundle_metadata helper function."""
+
+    def test_extract_metadata_with_all_tags(self):
+        """Test extracting metadata when all tags are present."""
+        html = '''
+        <html>
+        <head>
+        <meta property="og:title" content="Test Bundle Title">
+        <meta property="og:description" content="Test bundle description">
+        </head>
+        </html>
+        '''
+        result = _extract_bundle_metadata(html, "Fallback Name")
+        assert result["title"] == "Test Bundle Title"
+        assert result["description"] == "Test bundle description"
+
+    def test_extract_metadata_missing_title(self):
+        """Test extracting metadata when title tag is missing."""
+        html = '''
+        <html>
+        <head>
+        <meta property="og:description" content="Test description">
+        </head>
+        </html>
+        '''
+        result = _extract_bundle_metadata(html, "Fallback Name")
+        assert result["title"] == "Fallback Name"
+        assert result["description"] == "Test description"
+
+    def test_extract_metadata_missing_description(self):
+        """Test extracting metadata when description tag is missing."""
+        html = '''
+        <html>
+        <head>
+        <meta property="og:title" content="Test Title">
+        </head>
+        </html>
+        '''
+        result = _extract_bundle_metadata(html, "Fallback Name")
+        assert result["title"] == "Test Title"
+        assert result["description"] == "No description available"
+
+    def test_extract_metadata_all_missing(self):
+        """Test extracting metadata when all tags are missing."""
+        html = "<html><head></head></html>"
+        result = _extract_bundle_metadata(html, "Fallback Name")
+        assert result["title"] == "Fallback Name"
+        assert result["description"] == "No description available"
+
+
+class TestCheckForPricingTiers:
+    """Test the _check_for_pricing_tiers helper function."""
+
+    def test_check_for_pricing_tiers_found(self):
+        """Test when pricing tiers are found in HTML."""
+        html = '''
+        <html>
+        <body>
+        <script>
+        var data = {"tiers": [{"price": 1}, {"price": 10}]};
+        </script>
+        </body>
+        </html>
+        '''
+        result = _check_for_pricing_tiers(html)
+        assert "Price Tiers" in result
+        assert len(result) > 0
+
+    def test_check_for_pricing_tiers_not_found(self):
+        """Test when pricing tiers are not found."""
+        html = "<html><body></body></html>"
+        result = _check_for_pricing_tiers(html)
+        assert result == ""
+
+    def test_check_for_pricing_tiers_malformed_html(self):
+        """Test with malformed HTML doesn't crash."""
+        html = "<html><body><<invalid"
+        result = _check_for_pricing_tiers(html)
+        # Should return empty string, not crash
+        assert isinstance(result, str)

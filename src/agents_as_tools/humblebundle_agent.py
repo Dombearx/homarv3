@@ -53,6 +53,87 @@ def add_current_date() -> str:
     return f"Today is {date.today()}."
 
 
+def _get_category(product_url: str) -> str:
+    """
+    Determine bundle category from product URL.
+    
+    Args:
+        product_url: The product URL path (e.g., "/books/example-bundle")
+        
+    Returns:
+        Category string: "books", "games", "software", or "bundle"
+    """
+    if "/books/" in product_url:
+        return "books"
+    elif "/games/" in product_url:
+        return "games"
+    elif "/software/" in product_url:
+        return "software"
+    return "bundle"
+
+
+def _find_matching_url(bundle_name: str, urls: list[str]) -> str | None:
+    """
+    Find a matching bundle URL based on the bundle name.
+    
+    Args:
+        bundle_name: The name or partial name of the bundle to find
+        urls: List of bundle URLs to search through
+        
+    Returns:
+        The matching URL or None if not found
+    """
+    name_lower = bundle_name.lower()
+    for url in urls:
+        if name_lower in url.lower() or any(word in url.lower() for word in name_lower.split()):
+            return url
+    return None
+
+
+def _extract_bundle_metadata(html: str, bundle_name: str) -> dict:
+    """
+    Extract metadata (title and description) from bundle HTML.
+    
+    Args:
+        html: The HTML content of the bundle page
+        bundle_name: Fallback name if title not found
+        
+    Returns:
+        Dictionary with 'title' and 'description' keys
+    """
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    # Extract title
+    title_tag = soup.find('meta', property='og:title')
+    title = title_tag['content'] if title_tag else bundle_name
+    
+    # Extract description
+    desc_tag = soup.find('meta', property='og:description')
+    description = desc_tag['content'] if desc_tag else "No description available"
+    
+    return {"title": title, "description": description}
+
+
+def _check_for_pricing_tiers(html: str) -> str:
+    """
+    Check if bundle has pricing tier information.
+    
+    Args:
+        html: The HTML content of the bundle page
+        
+    Returns:
+        String with pricing tier info or empty string
+    """
+    try:
+        pricing_pattern = r'"tiers":\s*\[(.*?)\]'
+        pricing_match = re.search(pricing_pattern, html, re.DOTALL)
+        if pricing_match:
+            return "\n\nPrice Tiers: Check the bundle page for current pricing tiers."
+    except Exception:
+        pass
+    return ""
+
+
 @humblebundle_agent.tool_plain
 def list_bundles() -> str:
     """
@@ -92,13 +173,7 @@ def list_bundles() -> str:
                 bundle_url = f"https://www.humblebundle.com{product_url}"
                 
                 # Determine category from URL
-                category = "bundle"
-                if "/books/" in product_url:
-                    category = "books"
-                elif "/games/" in product_url:
-                    category = "games"
-                elif "/software/" in product_url:
-                    category = "software"
+                category = _get_category(product_url)
                 
                 bundles.append({
                     "name": tile_name,
@@ -146,13 +221,7 @@ def get_bundle_details(bundle_name: str) -> str:
         urls = re.findall(url_pattern, bundles_list)
         
         # Find matching bundle
-        name_lower = bundle_name.lower()
-        matching_url = None
-        
-        for url in urls:
-            if name_lower in url.lower() or any(word in url.lower() for word in name_lower.split()):
-                matching_url = url
-                break
+        matching_url = _find_matching_url(bundle_name, urls)
         
         if not matching_url:
             return f"Bundle '{bundle_name}' not found. Available bundles:\n{bundles_list}"
@@ -166,31 +235,18 @@ def get_bundle_details(bundle_name: str) -> str:
         response.raise_for_status()
         
         html = response.text
-        soup = BeautifulSoup(html, 'html.parser')
         
-        # Extract title
-        title_tag = soup.find('meta', property='og:title')
-        title = title_tag['content'] if title_tag else bundle_name
+        # Extract metadata
+        metadata = _extract_bundle_metadata(html, bundle_name)
         
-        # Extract description
-        desc_tag = soup.find('meta', property='og:description')
-        description = desc_tag['content'] if desc_tag else "No description available"
+        # Check for pricing tiers
+        tier_info = _check_for_pricing_tiers(html)
         
-        # Try to extract price tiers and content from JSON data
-        tier_info = ""
-        try:
-            # Look for pricing data
-            pricing_pattern = r'"tiers":\s*\[(.*?)\]'
-            pricing_match = re.search(pricing_pattern, html, re.DOTALL)
-            if pricing_match:
-                tier_info = "\n\nPrice Tiers: Check the bundle page for current pricing tiers."
-        except Exception:
-            pass
-        
+        # Format result
         result = f"Bundle Details:\n\n"
-        result += f"Name: {title}\n"
+        result += f"Name: {metadata['title']}\n"
         result += f"Link: {matching_url}\n"
-        result += f"Description: {description}\n"
+        result += f"Description: {metadata['description']}\n"
         result += tier_info
         result += f"\n\nVisit the link for full details, pricing, and to purchase."
         

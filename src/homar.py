@@ -95,11 +95,24 @@ async def image_generation_api(ctx: RunContext[MyDeps], description: str) -> str
     Returns:
         The filepath of the generted image.
     """
+    from src.agents_as_tools.image_generation_agent import generate_image
+
     r = await image_generation_agent.run(
         description,
         usage=ctx.usage,
     )
-    return r.output
+
+    # Generate the actual image file
+    image_filename = generate_image(r.output, "homar_generated")
+
+    # Store the image filename in deps so it can be sent back
+    if ctx.deps and ctx.deps.generated_images is not None:
+        from src.agents_as_tools.consts import IMAGE_GENERATION_OUTPUT_DIR
+
+        image_path = IMAGE_GENERATION_OUTPUT_DIR / image_filename
+        ctx.deps.generated_images.append(str(image_path))
+
+    return f"Image generated successfully: {image_filename}"
 
 
 @homar.tool
@@ -204,11 +217,11 @@ async def run_homar(message: str, channel: str = None, deps: MyDeps = None) -> s
 
 async def run_homar_with_history(
     new_message: str, history: list[ModelMessage], deps: MyDeps = None
-) -> tuple[str, list[ModelMessage]]:
+) -> tuple[str, list[ModelMessage], list[str]]:
     if deps is None:
         deps = MyDeps()
     agent_response = await homar.run(new_message, message_history=history, deps=deps)
-    return agent_response.output, agent_response.new_messages()
+    return agent_response.output, agent_response.new_messages(), deps.generated_images
 
 
 def print_schema(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:

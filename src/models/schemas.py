@@ -38,3 +38,8 @@ class MyDeps:
     mode: str = "standard"
     thread_id: Optional[int] = None
     send_message_callback: Optional[Any] = None
+    generated_images: list[str] = None  # List of image file paths generated during run
+
+    def __post_init__(self):
+        if self.generated_images is None:
+            self.generated_images = []

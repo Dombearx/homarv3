@@ -61,7 +61,7 @@ github_issue_agent = Agent(
 def create_github_issue(
     title: str,
     body: str,
-    labels: list[str] = None,
+    labels: list[str] | None = None,
 ) -> str:
     """Create a new GitHub issue in the homarv3 repository.
 

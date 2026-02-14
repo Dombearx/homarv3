@@ -1,13 +1,8 @@
-import os
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.mcp import MCPServerStreamableHTTP, MCPServerSSE
-import httpx
-import asyncio
-import time
 from dotenv import load_dotenv
-from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart
+from pydantic_ai import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
+from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from loguru import logger
 
 load_dotenv()

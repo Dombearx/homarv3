@@ -1,4 +1,4 @@
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from github import Github, Auth, GithubException
 import os

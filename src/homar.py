@@ -1,19 +1,15 @@
-import os
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.mcp import MCPServerStreamableHTTP, MCPServerSSE
-import httpx
-import asyncio
-import time
 from dotenv import load_dotenv
-from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart
+from pydantic_ai import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
+from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from loguru import logger
 
 load_dotenv()
 from src.agents_as_tools.todoist_agent import todoist_agent
 from src.agents_as_tools.home_assistant_agent import home_assistant_agent
 from src.agents_as_tools.image_generation_agent import image_generation_agent
+from src.agents_as_tools.github_issue_agent import github_issue_agent
 from src.delayed_message_scheduler import get_scheduler
 from src.models.schemas import MyDeps
 
@@ -118,6 +114,24 @@ async def grocy_api(ctx: RunContext[MyDeps], command: str) -> str:
 
     r = await grocy_agent.run(
         command,
+        usage=ctx.usage,
+    )
+    return r.output
+
+
+@homar.tool
+async def github_issue_api(ctx: RunContext[MyDeps], description: str) -> str:
+    """Use this tool to create GitHub issues on the homarv3 repository.
+    This tool helps create high-quality, detailed, and well-structured GitHub issues for bug reports, feature requests, or any other repository issues.
+
+    Args:
+        description: The description of the issue to create (can be brief - the agent will expand it into a detailed issue).
+
+    Returns:
+        The response confirming issue creation with issue number and URL.
+    """
+    r = await github_issue_agent.run(
+        description,
         usage=ctx.usage,
     )
     return r.output

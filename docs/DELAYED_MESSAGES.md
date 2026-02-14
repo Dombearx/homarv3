@@ -51,7 +51,7 @@ There are two tools available:
 
 #### 2. send_delayed_message Tool (`src/homar.py`)
 - PydanticAI tool that the agent can call
-- Accepts a message and delay in seconds
+- Accepts a message and delay specified in hours, minutes, and seconds
 - Validates the delay (1 second to 7 days)
 - Schedules the message using the DelayedMessageScheduler
 - Returns human-readable confirmation
@@ -131,14 +131,19 @@ Scheduled to send 'Check the oven' on 2024-12-25 at 09:00:00
 async def send_delayed_message(
     ctx: RunContext[MyDeps], 
     message: str, 
-    delay_seconds: int
+    hours: int = 0,
+    minutes: int = 0,
+    seconds: int = 0
 ) -> str
 ```
 
 **Parameters:**
 - `ctx`: PydanticAI run context with MyDeps (thread_id and send_message_callback)
 - `message`: The command/message to send after the delay
-- `delay_seconds`: How long to wait before sending (1 to 604800 seconds / 7 days)
+- `hours`: Number of hours to wait (0 to 168, default 0)
+- `minutes`: Number of minutes to wait (0 to 59, default 0)
+- `seconds`: Number of seconds to wait (0 to 59, default 0)
+- Total delay must be 1 second to 7 days (604800 seconds)
 
 **Returns:**
 - String confirmation of the scheduled message

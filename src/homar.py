@@ -164,7 +164,11 @@ def calculate_sum(a: int, b: int) -> int:
 
 @homar.tool
 async def send_delayed_message(
-    ctx: RunContext[MyDeps], message: str, delay_seconds: int
+    ctx: RunContext[MyDeps],
+    message: str,
+    hours: int = 0,
+    minutes: int = 0,
+    seconds: int = 0,
 ) -> str:
     """Schedule a message to be sent to yourself in this thread after a specified delay.
 
@@ -177,7 +181,9 @@ async def send_delayed_message(
 
     Args:
         message: The message/command to send to yourself after the delay
-        delay_seconds: How many seconds to wait before sending the message (1 to 604800)
+        hours: Number of hours to wait (0 to 168, default 0)
+        minutes: Number of minutes to wait (0 to 59, default 0)
+        seconds: Number of seconds to wait (0 to 59, default 0)
 
     Returns:
         Confirmation that the message has been scheduled
@@ -187,6 +193,9 @@ async def send_delayed_message(
     # Validate that we have the required context
     if not deps or not deps.thread_id or not deps.send_message_callback:
         return "Error: Cannot schedule delayed message - missing thread context"
+
+    # Calculate total delay in seconds
+    delay_seconds = hours * 3600 + minutes * 60 + seconds
 
     # Validate delay
     if delay_seconds < 1:

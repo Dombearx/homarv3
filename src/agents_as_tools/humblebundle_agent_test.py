@@ -18,13 +18,11 @@ class TestListBundles:
         <script>
         var data = {
             "tile_name": "Humble Game Bundle: Test Games",
-            "machine_name": "testgames_gamesbundle",
-            "type": "games"
+            "product_url": "/games/test-games"
         };
         var data2 = {
             "tile_name": "Humble Book Bundle: Test Books",
-            "machine_name": "testbooks_bookbundle",
-            "type": "books"
+            "product_url": "/books/test-books"
         };
         </script>
         </body>

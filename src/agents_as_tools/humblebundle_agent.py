@@ -76,52 +76,34 @@ def list_bundles() -> str:
         bundles = []
         
         # Extract bundle data from JSON in the page
-        # Look for tile data in the HTML
-        tile_pattern = r'"tile_name":\s*"([^"]+)".*?"machine_name":\s*"([^"]+)".*?"type":\s*"([^"]+)"'
+        # Look for tile data with product URLs in the HTML
+        tile_pattern = r'"tile_name":\s*"([^"]+)".*?"product_url":\s*"([^"]+)"'
         matches = re.findall(tile_pattern, html, re.DOTALL)
         
         seen_names = set()
         for match in matches:
-            tile_name, machine_name, bundle_type = match
+            tile_name, product_url = match
             # Clean up the data
             tile_name = tile_name.strip()
             if tile_name and tile_name not in seen_names:
                 seen_names.add(tile_name)
                 
-                # Determine bundle category based on name and type
+                # Build full URL
+                bundle_url = f"https://www.humblebundle.com{product_url}"
+                
+                # Determine category from URL
                 category = "bundle"
-                if "book" in tile_name.lower() or "book" in bundle_type.lower():
+                if "/books/" in product_url:
                     category = "books"
-                elif "game" in tile_name.lower() or "game" in bundle_type.lower():
+                elif "/games/" in product_url:
                     category = "games"
-                elif "software" in tile_name.lower() or "software" in bundle_type.lower():
+                elif "/software/" in product_url:
                     category = "software"
-                
-                # Create URL-friendly slug from machine name
-                # Extract the base name before _bundle suffix
-                slug = machine_name.replace('_', '-')
-                if slug.endswith('-bundle'):
-                    slug = slug[:-7]
-                if slug.endswith('-bookbundle'):
-                    slug = slug[:-11]
-                if slug.endswith('-gamesbundle'):
-                    slug = slug[:-12]
-                
-                # Construct the URL based on category
-                if category == "books":
-                    bundle_url = f"https://www.humblebundle.com/books/{slug}"
-                elif category == "games":
-                    bundle_url = f"https://www.humblebundle.com/games/{slug}"
-                elif category == "software":
-                    bundle_url = f"https://www.humblebundle.com/software/{slug}"
-                else:
-                    bundle_url = f"https://www.humblebundle.com/bundles/{slug}"
                 
                 bundles.append({
                     "name": tile_name,
                     "category": category,
-                    "url": bundle_url,
-                    "machine_name": machine_name
+                    "url": bundle_url
                 })
         
         if not bundles:

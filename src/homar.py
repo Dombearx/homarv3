@@ -14,6 +14,7 @@ load_dotenv()
 from src.agents_as_tools.todoist_agent import todoist_agent
 from src.agents_as_tools.home_assistant_agent import home_assistant_agent
 from src.agents_as_tools.image_generation_agent import image_generation_agent
+from src.agents_as_tools.google_calendar_agent import google_calendar_agent
 from src.delayed_message_scheduler import get_scheduler
 from src.models.schemas import MyDeps
 
@@ -130,6 +131,24 @@ async def grocy_api(ctx: RunContext[MyDeps], command: str) -> str:
     from src.agents_as_tools.grocy_agent import grocy_agent
 
     r = await grocy_agent.run(
+        command,
+        usage=ctx.usage,
+    )
+    return r.output
+
+
+@homar.tool
+async def google_calendar_api(ctx: RunContext[MyDeps], command: str) -> str:
+    """Use this tool to interact with Google Calendar - manage events, appointments, meetings, reminders with dates.
+    Use whenever user asks about calendar, schedule, events, appointments, or wants to create/check/modify calendar entries.
+
+    Args:
+        command: The natural language command to execute.
+
+    Returns:
+        The response from the Google Calendar API as a string.
+    """
+    r = await google_calendar_agent.run(
         command,
         usage=ctx.usage,
     )

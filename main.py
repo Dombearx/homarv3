@@ -167,6 +167,7 @@ async def on_message(message: discord.Message):
                 thread_id=thread.id, send_message_callback=_send_message_to_thread
             )
 
+            # Note: We ignore the updated history (_) as we fetch it fresh from Discord on each message
             response_message, _, generated_images = await run_homar_with_history(
                 new_message=actual_message, history=thread_history, deps=deps
             )

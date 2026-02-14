@@ -93,7 +93,7 @@ async def image_generation_api(ctx: RunContext[MyDeps], description: str) -> str
         description: The simple natural language description of image that should contains all imporant details.
 
     Returns:
-        The filepath of the generted image.
+        The filepath of the generated image.
     """
     from src.agents_as_tools.image_generation_agent import generate_image
 
@@ -106,7 +106,7 @@ async def image_generation_api(ctx: RunContext[MyDeps], description: str) -> str
     image_filename = generate_image(r.output, "homar_generated")
 
     # Store the image filename in deps so it can be sent back
-    if ctx.deps and ctx.deps.generated_images is not None:
+    if ctx.deps:
         from src.agents_as_tools.consts import IMAGE_GENERATION_OUTPUT_DIR
 
         image_path = IMAGE_GENERATION_OUTPUT_DIR / image_filename

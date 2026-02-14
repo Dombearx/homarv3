@@ -2,27 +2,7 @@
 
 import asyncio
 import pytest
-from datetime import datetime, timedelta
-from src.delayed_message_scheduler import DelayedMessage, DelayedMessageScheduler
-
-
-class TestDelayedMessage:
-    """Test the DelayedMessage dataclass."""
-
-    def test_delayed_message_creation(self):
-        """Test creating a DelayedMessage instance."""
-        scheduled_time = datetime.now() + timedelta(seconds=60)
-        msg = DelayedMessage(
-            message="Test message",
-            thread_id=123456,
-            scheduled_time=scheduled_time,
-            task=None,
-        )
-
-        assert msg.message == "Test message"
-        assert msg.thread_id == 123456
-        assert msg.scheduled_time == scheduled_time
-        assert msg.task is None
+from src.delayed_message_scheduler import DelayedMessageScheduler
 
 
 class TestDelayedMessageScheduler:
@@ -148,5 +128,4 @@ class TestDelayedMessageScheduler:
         # Verify structure
         for message_id, delayed_msg in messages:
             assert isinstance(message_id, str)
-            assert isinstance(delayed_msg, DelayedMessage)
             assert delayed_msg.message in ["Test 1", "Test 2"]

@@ -18,6 +18,7 @@ from src.agents_as_tools.image_generation_agent import image_generation_agent
 from src.agents_as_tools.google_calendar_agent import google_calendar_agent
 from src.delayed_message_scheduler import get_scheduler
 from src.models.schemas import MyDeps
+from src.memory import get_memory_manager
 
 # Constants
 MAX_DELAY_SECONDS = 86400 * 7  # 7 days
@@ -322,6 +323,118 @@ async def send_scheduled_message(
     except Exception as e:
         logger.error(f"Error scheduling message: {e}")
         return f"Error scheduling message: {str(e)}"
+
+
+@homar.tool
+async def remember_memory(
+    ctx: RunContext[MyDeps], user_preference: str
+) -> str:
+    """Store important user preferences or information in memory.
+
+    Use this tool ONLY when the user explicitly shares important preferences, 
+    personal information, or facts that should be remembered for future interactions.
+    Do NOT use this tool for general conversation or temporary information.
+    
+    Examples of when to use:
+    - User states: "I'm allergic to peanuts"
+    - User mentions: "I prefer communication in English"
+    - User says: "I like to wake up at 6 AM"
+    - User shares: "My favorite color is blue"
+    
+    Do NOT remember:
+    - Commands or requests (e.g., "turn on the light")
+    - Questions (e.g., "what's the weather?")
+    - Information already remembered (check with recall_memory first)
+    - Temporary context from current conversation
+
+    Args:
+        user_preference: The important user preference or information to remember
+
+    Returns:
+        Confirmation that the preference has been stored
+    """
+    try:
+        # Use thread_id as user_id for Discord threads
+        user_id = str(ctx.deps.thread_id) if ctx.deps.thread_id else "default_user"
+        
+        memory_manager = get_memory_manager()
+        result = memory_manager.add_memory(
+            content=user_preference,
+            user_id=user_id,
+            metadata={"source": "homar_agent"}
+        )
+        
+        if "error" in result:
+            logger.error(f"Error storing memory: {result['error']}")
+            return f"Failed to remember: {result['error']}"
+        
+        logger.info(f"Stored memory for user {user_id}: {user_preference}")
+        return f"Remembered: {user_preference}"
+    
+    except Exception as e:
+        logger.error(f"Error in remember_memory tool: {e}")
+        return f"Failed to remember preference: {str(e)}"
+
+
+@homar.tool
+async def recall_memory(
+    ctx: RunContext[MyDeps], query: str = ""
+) -> str:
+    """Retrieve previously stored user preferences and information from memory.
+
+    Use this tool to recall important user preferences or information that was 
+    previously stored. This helps provide personalized responses based on what 
+    the user has shared before.
+    
+    Use this tool when:
+    - Making recommendations based on user preferences
+    - Before storing new information (to check if it's already remembered)
+    - When the user asks about their preferences
+    - To personalize responses based on user history
+    
+    Args:
+        query: Optional search query to find specific memories. If empty, returns all memories.
+
+    Returns:
+        Relevant user preferences and information from memory
+    """
+    try:
+        # Use thread_id as user_id for Discord threads
+        user_id = str(ctx.deps.thread_id) if ctx.deps.thread_id else "default_user"
+        
+        memory_manager = get_memory_manager()
+        
+        if query:
+            # Search for specific memories
+            results = memory_manager.search_memories(
+                query=query,
+                user_id=user_id,
+                limit=5
+            )
+        else:
+            # Get all memories if no query provided
+            results = memory_manager.get_all_memories(user_id=user_id)
+        
+        if not results:
+            return "No memories found for this user."
+        
+        # Format the results
+        memory_list = []
+        for idx, result in enumerate(results, 1):
+            # Handle different result formats from mem0
+            if isinstance(result, dict):
+                memory_text = result.get("memory", result.get("text", str(result)))
+                memory_list.append(f"{idx}. {memory_text}")
+            else:
+                memory_list.append(f"{idx}. {str(result)}")
+        
+        memories_str = "\n".join(memory_list)
+        logger.info(f"Retrieved {len(results)} memories for user {user_id}")
+        return f"User memories:\n{memories_str}"
+    
+    except Exception as e:
+        logger.error(f"Error in recall_memory tool: {e}")
+        return f"Failed to recall memories: {str(e)}"
 
 
 async def run_homar_with_messages(

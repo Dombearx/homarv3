@@ -8,7 +8,7 @@ A Polish-speaking home assistant Discord bot powered by PydanticAI, with integra
 - **Todoist Integration**: Manage tasks, shopping lists, and reminders
 - **Grocy Integration**: Home groceries management
 - **Image Generation**: Generate RPG scene images
-- **GitHub Issue Creation**: Create high-quality, detailed GitHub issues on the homarv3 repository
+- **GitHub Issue Creation**: Create high-quality, detailed GitHub issues on the homarv3 repository (see [docs/GITHUB_ISSUES.md](docs/GITHUB_ISSUES.md))
 - **Delayed Message Tool**: Schedule commands to be executed after a specified delay (see [docs/DELAYED_MESSAGES.md](docs/DELAYED_MESSAGES.md))
 - **Conversation History**: Maintains context within Discord threads
 - **Multi-Agent Architecture**: Specialized sub-agents for different tasks

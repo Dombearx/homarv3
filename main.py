@@ -167,10 +167,25 @@ async def on_message(message: discord.Message):
                 thread_id=thread.id, send_message_callback=_send_message_to_thread
             )
 
-            response_message, _ = await run_homar_with_history(
+            # Note: We ignore the updated history (_) as we fetch it fresh from Discord on each message
+            response_message, _, generated_images = await run_homar_with_history(
                 new_message=actual_message, history=thread_history, deps=deps
             )
+
+            # Send text response
             await thread.send(response_message)
+
+            # Send any generated images as attachments
+            if generated_images:
+                for image_path in generated_images:
+                    try:
+                        if os.path.exists(image_path):
+                            await thread.send(file=discord.File(image_path))
+                            logger.info(f"Sent image: {image_path}")
+                        else:
+                            logger.warning(f"Image file not found: {image_path}")
+                    except Exception as img_error:
+                        logger.error(f"Failed to send image {image_path}: {img_error}")
     except Exception as e:
         logger.error(f"Error processing message: {e}")
         try:

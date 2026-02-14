@@ -9,6 +9,7 @@ A Polish-speaking home assistant Discord bot powered by PydanticAI, with integra
 - **Grocy Integration**: Home groceries management
 - **Google Calendar Integration**: Manage calendar events, appointments, and meetings
 - **Image Generation**: Generate RPG scene images
+- **Memory Layer**: Remember and recall user preferences using mem0 (see [docs/MEMORY.md](docs/MEMORY.md))
 - **Delayed Message Tool**: Schedule commands to be executed after a specified delay (see [docs/DELAYED_MESSAGES.md](docs/DELAYED_MESSAGES.md))
 - **Conversation History**: Maintains context within Discord threads
 - **Multi-Agent Architecture**: Specialized sub-agents for different tasks
@@ -28,13 +29,16 @@ homarv3/
 │   ├── displayer/               # FastAPI image viewer service
 │   ├── grocy_mcp/              # Grocy MCP server
 │   ├── homar.py                # Main Homar agent
+│   ├── memory.py               # Memory layer using mem0
 │   └── models/
 │       └── schemas.py          # Pydantic models
 ├── docs/
-│   └── DELAYED_MESSAGES.md     # Delayed message tool documentation
+│   ├── DELAYED_MESSAGES.md     # Delayed message tool documentation
+│   └── MEMORY.md               # Memory layer documentation
 ├── main.py                     # Discord bot entry point
 ├── pyproject.toml              # Poetry configuration
 └── Dockerfile                  # Docker configuration
+```
 ```
 
 ## Installation

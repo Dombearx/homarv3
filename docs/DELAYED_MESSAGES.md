@@ -143,7 +143,8 @@ async def send_delayed_message(
 - `hours`: Number of hours to wait (0 to 168, default 0)
 - `minutes`: Number of minutes to wait (0 to 59, default 0)
 - `seconds`: Number of seconds to wait (0 to 59, default 0)
-- Total delay must be 1 second to 7 days (604800 seconds)
+- Total delay must be at least 1 second and at most 7 days (604800 seconds)
+- At least one time parameter (hours, minutes, or seconds) must be greater than 0
 
 **Returns:**
 - String confirmation of the scheduled message

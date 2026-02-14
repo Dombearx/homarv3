@@ -194,12 +194,20 @@ async def send_delayed_message(
     if not deps or not deps.thread_id or not deps.send_message_callback:
         return "Error: Cannot schedule delayed message - missing thread context"
 
+    # Validate individual parameters
+    if hours < 0 or hours > 168:
+        return "Error: Hours must be between 0 and 168"
+    if minutes < 0 or minutes > 59:
+        return "Error: Minutes must be between 0 and 59"
+    if seconds < 0 or seconds > 59:
+        return "Error: Seconds must be between 0 and 59"
+
     # Calculate total delay in seconds
     delay_seconds = hours * 3600 + minutes * 60 + seconds
 
     # Validate delay
     if delay_seconds < 1:
-        return "Error: Delay must be at least 1 second"
+        return "Error: Delay must be at least 1 second (all time parameters cannot be zero)"
 
     if delay_seconds > MAX_DELAY_SECONDS:
         return f"Error: Maximum delay is 7 days ({MAX_DELAY_SECONDS} seconds)"

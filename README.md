@@ -8,6 +8,7 @@ A Polish-speaking home assistant Discord bot powered by PydanticAI, with integra
 - **Todoist Integration**: Manage tasks, shopping lists, and reminders
 - **Grocy Integration**: Home groceries management
 - **Google Calendar Integration**: Manage calendar events, appointments, and meetings
+- **HumbleBundle Integration**: Check available game, book, and software bundles from HumbleBundle.com
 - **Image Generation**: Generate RPG scene images
 - **Delayed Message Tool**: Schedule commands to be executed after a specified delay (see [docs/DELAYED_MESSAGES.md](docs/DELAYED_MESSAGES.md))
 - **Conversation History**: Maintains context within Discord threads
@@ -23,6 +24,7 @@ homarv3/
 │   │   ├── home_assistant_agent.py  # Home Assistant control
 │   │   ├── grocy_agent.py       # Grocy groceries management
 │   │   ├── google_calendar_agent.py  # Google Calendar integration
+│   │   ├── humblebundle_agent.py    # HumbleBundle deals checker
 │   │   └── image_generation_agent.py  # RPG image generation
 │   ├── delayed_message_scheduler.py  # Delayed message scheduling
 │   ├── displayer/               # FastAPI image viewer service
@@ -135,8 +137,9 @@ The bot responds to messages in Discord channels and threads. It supports:
 2. **Home control**: "Włącz światło w sypialni" (Turn on bedroom light)
 3. **Task management**: "Dodaj mleko do listy zakupów" (Add milk to shopping list)
 4. **Calendar management**: "Co mam w kalendarzu jutro?" (What's on my calendar tomorrow?)
-5. **Delayed actions**: "Wyłącz światło za godzinę" (Turn off light in 1 hour)
-6. **RPG image generation**: In #rpg or #rpg2 channels
+5. **HumbleBundle deals**: "Pokaż aktualne bundle na HumbleBundle" (Show current HumbleBundle deals)
+6. **Delayed actions**: "Wyłącz światło za godzinę" (Turn off light in 1 hour)
+7. **RPG image generation**: In #rpg or #rpg2 channels
 
 For more details on the delayed message feature, see [docs/DELAYED_MESSAGES.md](docs/DELAYED_MESSAGES.md).
 

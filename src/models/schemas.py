@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum, auto
-from typing import Optional, Any
+from typing import Any
 
 from pydantic import BaseModel, Field
 from pydantic_ai import ModelMessage
@@ -20,7 +20,7 @@ class InteractRequest(BaseModel):
     """Request model for interact endpoint."""
 
     message: str = Field(..., description="Message to process")
-    user_id: Optional[str] = Field(None, description="Optional user identifier")
+    user_id: str | None = Field(None, description="Optional user identifier")
 
 
 class HealthResponse(BaseModel):
@@ -36,9 +36,9 @@ class MyDeps:
     """Dependencies for agents."""
 
     mode: str = "standard"
-    thread_id: Optional[int] = None
-    send_message_callback: Optional[Any] = None
-    generated_images: Optional[list[str]] = (
+    thread_id: int | None = None
+    send_message_callback: Any | None = None
+    generated_images: list[str] | None = (
         None  # List of image file paths generated during run
     )
 

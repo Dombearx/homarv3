@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import Mock, patch
+import src.memory
 from src.models.schemas import MyDeps
 
 
@@ -55,7 +56,6 @@ async def test_memory_manager():
         
         # Reset memory manager singleton
         from src.memory import MemoryManager, get_memory_manager
-        import src.memory
         MemoryManager._instance = None
         MemoryManager._memory = None
         src.memory._memory_manager = None

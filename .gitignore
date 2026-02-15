@@ -47,6 +47,4 @@ htmlcov/
 data/
 
 # other code
-discord_bot
-main__old.py
 src/displayer/media/*

@@ -68,7 +68,7 @@ def generate_image(prompt: str, short_image_title: str) -> str:
     payload = {
         "input": {
             "prompt": prompt,
-            "seed": 12345,
+            "seed": seed,
             "guidance": 7.5,
             "width": 1920,
             "height": 1088,
@@ -76,9 +76,6 @@ def generate_image(prompt: str, short_image_title: str) -> str:
     }
 
     start_time = asyncio.get_event_loop().time()
-    # run_request = endpoint.run(
-    #     {"input": {"workflow": workflow}}
-    # )
     print("Sending request to endpoint")
     run_request = endpoint.run(payload)
 
@@ -93,40 +90,8 @@ def generate_image(prompt: str, short_image_title: str) -> str:
 
     image = result["image"]
 
-    upscale_payload = {
-        "input": {
-            "source_image": image,
-            "model": "RealESRGAN_x4plus",
-            "scale": 2,
-            "face_enhance": False,
-        }
-    }
-
     with open(IMAGE_GENERATION_OUTPUT_DIR / f"{0}_{image_filename}", "wb") as f:
         f.write(base64.b64decode(image))
-
-    # start_time = asyncio.get_event_loop().time()
-    # # run_request = endpoint.run(
-    # #     {"input": {"workflow": workflow}}
-    # # )
-    # print("Sending request to upscale endpoint")
-    # run_request = upscale_endpoint.run(
-    #     upscale_payload
-    # )
-    # while run_request.status() != "COMPLETED":
-    #     await asyncio.sleep(1)
-    # result = run_request.output()
-    # end_time = asyncio.get_event_loop().time()
-    # print(f"Image upscaling completed in {end_time - start_time:.2f} seconds.")
-
-    # image = result["image"]
-
-    # with open(IMAGE_GENERATION_OUTPUT_DIR / f"{0}_{image_filename}", "wb") as f:
-    #     f.write(base64.b64decode(image))
-
-    # # for i, image in enumerate(result["images"]):
-    # #     with open(IMAGE_GENERATION_OUTPUT_DIR / f"{i}_{image_filename}", "wb") as f:
-    # #         f.write(base64.b64decode(image["data"]))
 
     return f"0_{image_filename}"
 

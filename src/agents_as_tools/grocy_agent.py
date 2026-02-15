@@ -6,11 +6,6 @@ from pydantic_ai.toolsets.fastmcp import FastMCPToolset
 from datetime import datetime
 from src.grocy_mcp.grocy_mcp import mcp
 
-# grocy_mcp_server = MCPServerStdio(
-#     "python",
-#     args=["-m", "src.grocy_mcp.grocy_mcp"],
-# )
-
 grocy_mcp_toolset = FastMCPToolset(mcp)
 
 GROCY_AGENT_PROMPT = """
@@ -52,7 +47,7 @@ async def add_devices_info(ctx: RunContext) -> str:
 
 if __name__ == "__main__":
     import asyncio
-
+    # test
     async def main():
         r = await grocy_agent.run(
             "Open a milk",

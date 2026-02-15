@@ -64,6 +64,7 @@ async def todoist_api(ctx: RunContext[MyDeps], command: str) -> str:
     """
     r = await todoist_agent.run(
         command,
+        deps=ctx.deps,
         usage=ctx.usage,
     )
     return r.output
@@ -82,6 +83,7 @@ async def home_assistant_api(ctx: RunContext[MyDeps], command: str) -> str:
     """
     r = await home_assistant_agent.run(
         command,
+        deps=ctx.deps,
         usage=ctx.usage,
     )
     return r.output
@@ -102,6 +104,7 @@ async def image_generation_api(ctx: RunContext[MyDeps], description: str) -> str
 
     r = await image_generation_agent.run(
         description,
+        deps=ctx.deps,
         usage=ctx.usage,
     )
 
@@ -134,6 +137,7 @@ async def grocy_api(ctx: RunContext[MyDeps], command: str) -> str:
 
     r = await grocy_agent.run(
         command,
+        deps=ctx.deps,
         usage=ctx.usage,
     )
     return r.output
@@ -152,6 +156,7 @@ async def google_calendar_api(ctx: RunContext[MyDeps], command: str) -> str:
     """
     r = await google_calendar_agent.run(
         command,
+        deps=ctx.deps,
         usage=ctx.usage,
     )
     return r.output
@@ -171,6 +176,7 @@ async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
     """
     r = await humblebundle_agent.run(
         command,
+        deps=ctx.deps,
         usage=ctx.usage,
     )
     return r.output

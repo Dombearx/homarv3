@@ -86,21 +86,28 @@ def _get_actual_message(message: discord.Message, is_delayed_command: bool) -> s
 
 async def _get_thread_history(thread: discord.Thread) -> list:
     """Fetch message history from Discord thread and convert to ModelMessage format."""
-    from pydantic_ai import ModelMessage, TextPart
+    from pydantic_ai import ModelRequest, ModelResponse, TextPart, UserPromptPart
 
-    # Fetch last 50 messages from thread
+    # Fetch last 100 messages from thread
     messages = []
-    async for msg in thread.history(limit=50):
+    async for msg in thread.history(limit=100):
         # Skip system messages, include both user and bot messages
         if msg.type != discord.MessageType.default:
             continue
 
-        # Determine role: bot messages are "assistant", user messages are "user"
-        role = "assistant" if msg.author.bot else "user"
-        messages.append(ModelMessage(role=role, content=[TextPart(text=msg.content)]))
+        # Create appropriate message type based on author
+        if msg.author.bot:
+            # Bot messages are ModelResponse with TextPart
+            messages.append(ModelResponse(parts=[TextPart(content=msg.content)]))
+        else:
+            # User messages are ModelRequest with UserPromptPart
+            messages.append(ModelRequest(parts=[UserPromptPart(content=msg.content)]))
 
-    # Reverse to get chronological order
-    return list(reversed(messages))
+    # Reverse to get chronological order (oldest first)
+    result = list(reversed(messages))
+    logger.info(f"Fetched {len(result)} messages from thread {thread.id} ({thread.name})")
+    
+    return result
 
 
 @bot.event
@@ -154,44 +161,44 @@ async def on_message(message: discord.Message):
         except Exception:
             thread = message.channel
 
-    try:
-        async with thread.typing():
-            # Extract the actual message content
-            actual_message = _get_actual_message(message, is_delayed_command)
+    # try:
+    async with thread.typing():
+        # Extract the actual message content
+        actual_message = _get_actual_message(message, is_delayed_command)
 
-            # Fetch thread history from Discord instead of external database
-            thread_history = await _get_thread_history(thread)
+        # Fetch thread history from Discord instead of external database
+        thread_history = await _get_thread_history(thread)
 
-            # Create deps with thread context for delayed message support
-            deps = MyDeps(
-                thread_id=thread.id, send_message_callback=_send_message_to_thread
-            )
+        # Create deps with thread context for delayed message support
+        deps = MyDeps(
+            thread_id=thread.id, send_message_callback=_send_message_to_thread
+        )
 
-            # Note: We ignore the updated history (_) as we fetch it fresh from Discord on each message
-            response_message, _, generated_images = await run_homar_with_history(
-                new_message=actual_message, history=thread_history, deps=deps
-            )
+        # Note: We ignore the updated history (_) as we fetch it fresh from Discord on each message
+        response_message, _, generated_images = await run_homar_with_history(
+            new_message=actual_message, history=thread_history, deps=deps
+        )
 
-            # Send text response
-            await thread.send(response_message)
+        # Send text response
+        await thread.send(response_message)
 
-            # Send any generated images as attachments
-            if generated_images:
-                for image_path in generated_images:
-                    try:
-                        if os.path.exists(image_path):
-                            await thread.send(file=discord.File(image_path))
-                            logger.info(f"Sent image: {image_path}")
-                        else:
-                            logger.warning(f"Image file not found: {image_path}")
-                    except Exception as img_error:
-                        logger.error(f"Failed to send image {image_path}: {img_error}")
-    except Exception as e:
-        logger.error(f"Error processing message: {e}")
-        try:
-            await thread.send(f"Error getting response: {e}")
-        except Exception as send_error:
-            logger.error(f"Failed to send error message: {send_error}")
+        # Send any generated images as attachments
+        if generated_images:
+            for image_path in generated_images:
+                try:
+                    if os.path.exists(image_path):
+                        await thread.send(file=discord.File(image_path))
+                        logger.info(f"Sent image: {image_path}")
+                    else:
+                        logger.warning(f"Image file not found: {image_path}")
+                except Exception as img_error:
+                    logger.error(f"Failed to send image {image_path}: {img_error}")
+    # except Exception as e:
+    #     logger.error(f"Error processing message: {e}")
+    #     try:
+    #         await thread.send(f"Error getting response: {e}")
+    #     except Exception as send_error:
+    #         logger.error(f"Failed to send error message: {send_error}")
 
 
 def run_discord_bot():

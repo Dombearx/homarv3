@@ -43,15 +43,13 @@ image_generation_agent = Agent(
 
 @image_generation_agent.system_prompt
 async def get_system_prompt(ctx: RunContext[MyDeps]) -> str:
-    if ctx.deps.mode == "standard":
+    if not ctx.deps.mode or ctx.deps.mode == "horror":
         return IMAGE_GENERATION_AGENT_PROMPT.replace(
-            "{{guidelines}}", DEFAULT_COSMIC_GUIDELINES
+            "{{guidelines}}", HORROR_COSMIC_GUIDELINES
         )
-
     return IMAGE_GENERATION_AGENT_PROMPT.replace(
-        "{{guidelines}}", HORROR_COSMIC_GUIDELINES
+        "{{guidelines}}", DEFAULT_COSMIC_GUIDELINES
     )
-
 
 def generate_image(prompt: str, short_image_title: str) -> str:
     """Use this tool to generate an image based on a text prompt."""
@@ -62,13 +60,14 @@ def generate_image(prompt: str, short_image_title: str) -> str:
         workflow = json.load(f)
 
     seed = os.urandom(2)
-    workflow["31"]["inputs"]["seed"] = int.from_bytes(seed, "big")
+    seed_int = int.from_bytes(seed, "big")
+    workflow["31"]["inputs"]["seed"] = seed_int
     workflow["6"]["inputs"]["text"] = prompt
 
     payload = {
         "input": {
             "prompt": prompt,
-            "seed": seed,
+            "seed": seed_int,
             "guidance": 7.5,
             "width": 1920,
             "height": 1088,

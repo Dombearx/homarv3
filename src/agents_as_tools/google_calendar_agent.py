@@ -11,10 +11,13 @@ load_dotenv()
 # The server will be run via npx, using the credentials from environment variable
 google_calendar_mcp_server = MCPServerStdio(
     "npx",
-    args=["-y", "mcp-google-calendar"],
+    args=["-y", "@cocal/google-calendar-mcp"],
     env={
-        "CREDENTIALS_PATH": os.getenv(
-            "GOOGLE_CALENDAR_CREDENTIALS_PATH", "./credentials.json"
+        "GOOGLE_OAUTH_CREDENTIALS": os.getenv(
+            "GOOGLE_OAUTH_CREDENTIALS"
+        ),
+        "GOOGLE_CALENDAR_MCP_TOKEN_PATH": os.getenv(
+            "GOOGLE_CALENDAR_MCP_TOKEN_PATH"
         )
     },
 )

@@ -92,12 +92,12 @@ homarv3/
       - Click "Create Credentials" > "OAuth client ID"
       - Choose "Desktop app" as the application type
       - Download the credentials JSON file
-      - Save it and set the path in `GOOGLE_CALENDAR_CREDENTIALS_PATH` environment variable
+      - Save it as `gcp-oauth.keys.json` and set the path in `GOOGLE_CALENDAR_CREDENTIALS_PATH` environment variable
    
    f. On first run, the MCP server will open a browser for OAuth authorization. Follow the prompts to authorize access.
 
 6. **Install Node.js** (required for Google Calendar MCP server):
-   The Google Calendar agent uses the `mcp-google-calendar` npm package which runs via `npx`.
+   The Google Calendar agent uses the `@cocal/google-calendar-mcp` npm package which runs via `npx`.
    ```bash
    # Install Node.js if not already installed
    # On Ubuntu/Debian:

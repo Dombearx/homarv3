@@ -43,6 +43,10 @@ data/chats/*
 htmlcov/
 *.cover
 
+# gcp
+gcp-oauth.keys.json
+mcp-google-calendar-token.json
+
 # data
 data/
 

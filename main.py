@@ -161,44 +161,44 @@ async def on_message(message: discord.Message):
         except Exception:
             thread = message.channel
 
-    # try:
-    async with thread.typing():
-        # Extract the actual message content
-        actual_message = _get_actual_message(message, is_delayed_command)
+    try:
+        async with thread.typing():
+            # Extract the actual message content
+            actual_message = _get_actual_message(message, is_delayed_command)
 
-        # Fetch thread history from Discord instead of external database
-        thread_history = await _get_thread_history(thread)
+            # Fetch thread history from Discord instead of external database
+            thread_history = await _get_thread_history(thread)
 
-        # Create deps with thread context for delayed message support
-        deps = MyDeps(
-            thread_id=thread.id, send_message_callback=_send_message_to_thread
-        )
+            # Create deps with thread context for delayed message support
+            deps = MyDeps(
+                thread_id=thread.id, send_message_callback=_send_message_to_thread
+            )
 
-        # Note: We ignore the updated history (_) as we fetch it fresh from Discord on each message
-        response_message, _, generated_images = await run_homar_with_history(
-            new_message=actual_message, history=thread_history, deps=deps
-        )
+            # Note: We ignore the updated history (_) as we fetch it fresh from Discord on each message
+            response_message, _, generated_images = await run_homar_with_history(
+                new_message=actual_message, history=thread_history, deps=deps
+            )
 
-        # Send text response
-        await thread.send(response_message)
+            # Send text response
+            await thread.send(response_message)
 
-        # Send any generated images as attachments
-        if generated_images:
-            for image_path in generated_images:
-                try:
-                    if os.path.exists(image_path):
-                        await thread.send(file=discord.File(image_path))
-                        logger.info(f"Sent image: {image_path}")
-                    else:
-                        logger.warning(f"Image file not found: {image_path}")
-                except Exception as img_error:
-                    logger.error(f"Failed to send image {image_path}: {img_error}")
-    # except Exception as e:
-    #     logger.error(f"Error processing message: {e}")
-    #     try:
-    #         await thread.send(f"Error getting response: {e}")
-    #     except Exception as send_error:
-    #         logger.error(f"Failed to send error message: {send_error}")
+            # Send any generated images as attachments
+            if generated_images:
+                for image_path in generated_images:
+                    try:
+                        if os.path.exists(image_path):
+                            await thread.send(file=discord.File(image_path))
+                            logger.info(f"Sent image: {image_path}")
+                        else:
+                            logger.warning(f"Image file not found: {image_path}")
+                    except Exception as img_error:
+                        logger.error(f"Failed to send image {image_path}: {img_error}")
+    except Exception as e:
+        logger.error(f"Error processing message: {e}")
+        try:
+            await thread.send(f"Error getting response: {e}")
+        except Exception as send_error:
+            logger.error(f"Failed to send error message: {send_error}")
 
 
 def run_discord_bot():

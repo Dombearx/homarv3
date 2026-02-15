@@ -16,6 +16,10 @@ RUN poetry config virtualenvs.create false && \
 COPY main.py ./
 COPY src/ ./src/
 
+# copy credentials for google calendar mcp server
+COPY gcp-oauth.keys.json ./
+COPY mcp-google-calendar-token.json ./
+
 
 # Run the application
 CMD ["poetry", "run", "python", "main.py"] 

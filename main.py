@@ -81,18 +81,45 @@ async def _send_message_to_thread(message: str, thread_id: int):
         logger.error(f"Error sending message to thread {thread_id}: {e}")
 
 
-def _get_actual_message(message: discord.Message, is_delayed_command: bool) -> str:
-    """Extract the actual message content, removing delayed command marker if present."""
+def _get_actual_message(
+    message: discord.Message, is_delayed_command: bool
+) -> str | list:
+    """Extract the actual message content, removing delayed command marker if present.
+    Returns either a string or a list containing text and ImageUrl objects."""
+    from pydantic_ai import ImageUrl
+
+    # Extract text content
     if is_delayed_command:
         actual_message = message.content[len(DELAYED_COMMAND_MARKER) :].strip()
         logger.info(f"Processing delayed command: {actual_message}")
-        return actual_message
-    return message.content
+        text_content = actual_message
+    else:
+        text_content = message.content
+
+    # Check for image attachments
+    content = []
+    if text_content:
+        content.append(text_content)
+
+    for attachment in message.attachments:
+        if attachment.content_type and attachment.content_type.startswith("image/"):
+            content.append(ImageUrl(url=attachment.url))
+
+    # Return simple string if only text, otherwise return list
+    if len(content) == 1 and isinstance(content[0], str):
+        return content[0]
+    return content if content else ""
 
 
 async def _get_thread_history(thread: discord.Thread) -> list:
     """Fetch message history from Discord thread and convert to ModelMessage format."""
-    from pydantic_ai import ModelRequest, ModelResponse, TextPart, UserPromptPart
+    from pydantic_ai import (
+        ModelRequest,
+        ModelResponse,
+        TextPart,
+        UserPromptPart,
+        ImageUrl,
+    )
 
     # Fetch last 100 messages from thread
     messages = []
@@ -107,12 +134,32 @@ async def _get_thread_history(thread: discord.Thread) -> list:
             messages.append(ModelResponse(parts=[TextPart(content=msg.content)]))
         else:
             # User messages are ModelRequest with UserPromptPart
-            messages.append(ModelRequest(parts=[UserPromptPart(content=msg.content)]))
+            # Build content list with text and images
+            content = []
+            if msg.content:
+                content.append(msg.content)
+
+            # Add image attachments
+            for attachment in msg.attachments:
+                if attachment.content_type and attachment.content_type.startswith(
+                    "image/"
+                ):
+                    content.append(ImageUrl(url=attachment.url))
+
+            # Use simple string if only text, otherwise use list
+            if len(content) == 1 and isinstance(content[0], str):
+                messages.append(
+                    ModelRequest(parts=[UserPromptPart(content=content[0])])
+                )
+            elif content:
+                messages.append(ModelRequest(parts=[UserPromptPart(content=content)]))
 
     # Reverse to get chronological order (oldest first)
     result = list(reversed(messages))
-    logger.info(f"Fetched {len(result)} messages from thread {thread.id} ({thread.name})")
-    
+    logger.info(
+        f"Fetched {len(result)} messages from thread {thread.id} ({thread.name})"
+    )
+
     return result
 
 

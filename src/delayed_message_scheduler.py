@@ -87,7 +87,7 @@ class DelayedMessageScheduler:
         if scheduled_time.tzinfo is None:
             tz = ZoneInfo(DEFAULT_TIMEZONE)
             scheduled_time = scheduled_time.replace(tzinfo=tz)
-        
+
         # Get current time in UTC and convert to the target timezone for comparison
         now = datetime.now(tz=scheduled_time.tzinfo)
         delay = (scheduled_time - now).total_seconds()

@@ -415,8 +415,8 @@ async def cancel_scheduled_message(ctx: RunContext[MyDeps], message_id: str) -> 
     if success:
         logger.info(f"Cancelled scheduled message {message_id}")
         return f"Successfully cancelled scheduled message: {message_id}"
-    else:
-        return f"Could not find scheduled message with ID: {message_id}. Use list_scheduled_messages to see available IDs."
+    
+    return f"Could not find scheduled message with ID: {message_id}. Use list_scheduled_messages to see available IDs."
 
 
 async def run_homar_with_messages(

@@ -107,16 +107,45 @@ class TestSchedulingTools:
         return MyDeps(thread_id=12345, send_message_callback=mock_callback)
 
     @pytest.fixture(autouse=True)
-    def clear_scheduler(self):
+    async def clear_scheduler(self):
         """Clear all scheduled messages before each test."""
         scheduler = get_scheduler()
-        # Cancel all existing messages
-        for message_id, _ in scheduler.get_scheduled_messages():
+        # Cancel all existing messages and collect their tasks
+        tasks_to_wait = []
+        for message_id, delayed_msg in scheduler.get_scheduled_messages():
+            if delayed_msg.task and not delayed_msg.task.done():
+                tasks_to_wait.append(delayed_msg.task)
             scheduler.cancel_message(message_id)
+        
+        # Wait for all cancelled tasks to complete
+        for task in tasks_to_wait:
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
+        
         yield
+        
         # Clean up after test
-        for message_id, _ in scheduler.get_scheduled_messages():
+        tasks_to_wait = []
+        for message_id, delayed_msg in scheduler.get_scheduled_messages():
+            if delayed_msg.task and not delayed_msg.task.done():
+                tasks_to_wait.append(delayed_msg.task)
             scheduler.cancel_message(message_id)
+        
+        # Wait for all cancelled tasks to complete
+        for task in tasks_to_wait:
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
+        
+        # Give a small delay for any remaining cleanup
+        await asyncio.sleep(0.1)
 
     @pytest.mark.asyncio
     async def test_list_scheduled_messages_empty(self):

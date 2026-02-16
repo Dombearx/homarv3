@@ -12,7 +12,6 @@ This is a Python-based Discord bot named "Homar" (Polish-speaking home assistant
 - **Format code**: `make format`
 - **Run tests**: `make test` or `poetry run pytest`
 - **Run bot locally**: `make run` or `poetry run python main.py`
-- **Build Docker image**: `make docker_build`
 
 ### Testing
 - Tests are written using pytest with async support
@@ -72,7 +71,7 @@ This is a Python-based Discord bot named "Homar" (Polish-speaking home assistant
 6. **Write tests**: Add tests for new functionality following the `*_test.py` convention
 7. **Mock external services**: Use `pytest-mock` or `unittest.mock` to mock external APIs and services in tests
 8. **Document tools clearly**: Tool docstrings help the AI understand when to use them
-9. **Environment variables**: Use `.env` file for configuration (see `.env` file or README for required variables)
+9. **Environment variables**: Use `.env` file for configuration (see `.env.example` or README for required variables)
 10. **Error handling**: Handle API errors gracefully and provide useful error messages
 
 ## Agent-Specific Notes
@@ -90,15 +89,26 @@ Example:
 ```python
 @homar.tool
 async def my_new_tool(ctx: RunContext[MyDeps], parameter: str) -> str:
-    """Tool description for the AI to understand when to use it."""
+    """
+    Tool description for the AI to understand when to use it.
+    
+    Args:
+        parameter: Description of what this parameter does
+    """
     # Implementation
     return "result"
 ```
 
 ### Creating New Sub-Agents
+Create a sub-agent (rather than a plain tool) when:
+- The tool requires specific instructions on how to properly use it (e.g., Todoist agent has instructions on creating shopping lists correctly)
+- There are many related tools that work together and share context
+- The functionality benefits from its own dedicated agent with specialized behavior
+
 New sub-agents should be created in `src/agents_as_tools/` and follow the pattern:
 - Import and use PydanticAI Agent
 - Define tools specific to that integration
+- Add agent-specific instructions if needed
 - Export the agent for use in the main Homar agent
 
 ## Discord Bot Specifics
@@ -117,8 +127,9 @@ New sub-agents should be created in `src/agents_as_tools/` and follow the patter
 
 ## Important Conventions
 
-- Use Polish language for user-facing messages and responses
+- The bot responds in the same language as the user's input (no additional work needed)
 - Keep responses concise and to the point (as per bot's instructions)
+- Comments and logs should be in English
 - Environment variables should be loaded via `python-dotenv`
 - Mock `logfire` module in tests to avoid authentication issues (see `conftest.py`)
 - Set fake environment variables in tests to prevent initialization errors

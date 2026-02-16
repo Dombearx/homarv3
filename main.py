@@ -105,10 +105,16 @@ def _get_actual_message(
         if attachment.content_type and attachment.content_type.startswith("image/"):
             content.append(ImageUrl(url=attachment.url))
 
-    # Return simple string if only text, otherwise return list
-    if len(content) == 1 and isinstance(content[0], str):
+    # Return based on content type
+    if len(content) == 0:
+        # No content at all
+        return ""
+    elif len(content) == 1 and isinstance(content[0], str):
+        # Only text, no images
         return content[0]
-    return content if content else ""
+    else:
+        # Mixed content (text + images) or images only
+        return content
 
 
 async def _get_thread_history(thread: discord.Thread) -> list:

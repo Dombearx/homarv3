@@ -2,6 +2,7 @@
 
 import asyncio
 import pytest
+import pytest_asyncio
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from src.models.schemas import MyDeps
@@ -106,13 +107,15 @@ class TestSchedulingTools:
         """Create MyDeps with thread context."""
         return MyDeps(thread_id=12345, send_message_callback=mock_callback)
 
-    @pytest.fixture(autouse=True)
+    @pytest_asyncio.fixture(autouse=True)
     async def clear_scheduler(self):
         """Clear all scheduled messages before each test."""
         scheduler = get_scheduler()
-        # Cancel all existing messages and collect their tasks
+        
+        # Cancel all existing messages and collect their tasks (BEFORE test)
         tasks_to_wait = []
-        for message_id, delayed_msg in scheduler.get_scheduled_messages():
+        messages_before = list(scheduler.get_scheduled_messages())
+        for message_id, delayed_msg in messages_before:
             if delayed_msg.task and not delayed_msg.task.done():
                 tasks_to_wait.append(delayed_msg.task)
             scheduler.cancel_message(message_id)
@@ -125,12 +128,24 @@ class TestSchedulingTools:
                 pass
             except Exception:
                 pass
+        
+        # Extra wait to ensure cleanup completes
+        await asyncio.sleep(0.2)
+        
+        # Verify cleanup succeeded
+        remaining = scheduler.get_scheduled_messages()
+        if remaining:
+            # Force cleanup if still messages present
+            for message_id, _ in remaining:
+                scheduler.cancel_message(message_id)
+            await asyncio.sleep(0.1)
         
         yield
         
         # Clean up after test
         tasks_to_wait = []
-        for message_id, delayed_msg in scheduler.get_scheduled_messages():
+        messages_after = list(scheduler.get_scheduled_messages())
+        for message_id, delayed_msg in messages_after:
             if delayed_msg.task and not delayed_msg.task.done():
                 tasks_to_wait.append(delayed_msg.task)
             scheduler.cancel_message(message_id)
@@ -144,8 +159,8 @@ class TestSchedulingTools:
             except Exception:
                 pass
         
-        # Give a small delay for any remaining cleanup
-        await asyncio.sleep(0.1)
+        # Extra wait to ensure cleanup completes
+        await asyncio.sleep(0.2)
 
     @pytest.mark.asyncio
     async def test_list_scheduled_messages_empty(self):

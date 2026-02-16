@@ -146,7 +146,8 @@ class DelayedMessageScheduler:
             # Message may already be removed by cancel_message()
             if message_id in self._scheduled_messages:
                 del self._scheduled_messages[message_id]
-            raise  # Re-raise to properly finish the task
+            # Re-raise to propagate cancellation signal properly through asyncio
+            raise
         except Exception as e:
             logger.error(f"Error sending delayed message {message_id}: {e}")
             if message_id in self._scheduled_messages:

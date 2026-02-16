@@ -6,7 +6,7 @@ import warnings
 
 # Suppress audioop deprecation warning from discord.py as we don't use voice features
 # discord.py 2.6.4+ handles Python 3.13+ via audioop-lts dependency
-warnings.filterwarnings("ignore", message="'audioop' is deprecated", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="discord.player")
 
 import discord
 from discord.ext import commands

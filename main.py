@@ -203,18 +203,7 @@ async def on_message(message: discord.Message):
                 approval_results = await request_approval(thread, response_output)
 
                 # Continue the agent run with approval results
-                # Include the message history from the first run
-                (
-                    response_output,
-                    new_messages,
-                    generated_images,
-                ) = await run_homar_with_history(
-                    new_message=actual_message,
-                    history=thread_history,
-                    deps=deps,
-                )
-
-                # Now re-run with the deferred results
+                # Use the message history from the first run
                 from src.homar import homar
 
                 agent_response = await homar.run(

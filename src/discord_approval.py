@@ -137,7 +137,8 @@ async def request_approval(
     message_content = "\n".join(message_parts)
 
     # Send the approval request with buttons
-    view = ApprovalView(message_id=0)  # Temporary ID
+    # Temporary message_id of 0 will be replaced with actual message ID after sending
+    view = ApprovalView(message_id=0)
     approval_message = await thread.send(message_content, view=view)
 
     # Create a future to wait for user response

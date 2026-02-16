@@ -1,11 +1,15 @@
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.mcp import MCPServerStdio
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import os
 from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Default timezone for date/time operations
+DEFAULT_TIMEZONE = "Europe/Warsaw"
 
 # Initialize Google Calendar MCP server
 # The server will be run via npx, using the credentials from environment variable
@@ -52,4 +56,6 @@ google_calendar_agent = Agent(
 
 @google_calendar_agent.instructions
 def add_current_date() -> str:
-    return f"Today is {date.today()}."
+    tz = ZoneInfo(DEFAULT_TIMEZONE)
+    today = datetime.now(tz=tz).date()
+    return f"Today is {today}."

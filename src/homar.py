@@ -5,6 +5,7 @@ import httpx
 import asyncio
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
@@ -279,6 +280,7 @@ async def send_scheduled_message(
         message: The message/command to send to yourself at the scheduled time
         scheduled_datetime: ISO 8601 datetime string (e.g., "2024-12-25T09:00:00" or "2024-12-25 09:00:00")
                            Can also be just date "2024-12-25" (will use 00:00:00 time)
+                           Times are interpreted in Europe/Warsaw timezone (CET/CEST)
 
     Returns:
         Confirmation that the message has been scheduled
@@ -288,6 +290,10 @@ async def send_scheduled_message(
     # Validate that we have the required context
     if not deps or not deps.thread_id or not deps.send_message_callback:
         return "Error: Cannot schedule message - missing thread context"
+
+    # Get the default timezone
+    scheduler = get_scheduler()
+    tz = ZoneInfo(scheduler.get_default_timezone())
 
     # Parse the datetime string
     try:
@@ -301,7 +307,10 @@ async def send_scheduled_message(
             "%Y-%m-%d",
         ]:
             try:
+                # Parse as naive datetime then make it timezone-aware
                 scheduled_time = datetime.strptime(scheduled_datetime, fmt)
+                # Make it timezone-aware (interpret as local timezone)
+                scheduled_time = scheduled_time.replace(tzinfo=tz)
                 break
             except ValueError:
                 continue
@@ -316,8 +325,8 @@ async def send_scheduled_message(
         return f"Error parsing datetime: {str(e)}"
 
     # Validate that the time is in the future
-    # Note: Using naive datetime (local server time) for consistency with scheduled_time
-    now = datetime.now()
+    # Use timezone-aware current time for comparison
+    now = datetime.now(tz=tz)
     if scheduled_time <= now:
         return "Error: Scheduled time must be in the future"
 
@@ -325,9 +334,6 @@ async def send_scheduled_message(
     delay_seconds = (scheduled_time - now).total_seconds()
     if delay_seconds > MAX_DELAY_SECONDS:
         return f"Error: Maximum delay is 7 days ({MAX_DELAY_SECONDS} seconds)"
-
-    # Schedule the message
-    scheduler = get_scheduler()
 
     # Create a special marker to identify this as a delayed message from the bot
     marked_message = f"[DELAYED_COMMAND] {message}"
@@ -340,7 +346,7 @@ async def send_scheduled_message(
             send_callback=deps.send_message_callback,
         )
 
-        scheduled_str = scheduled_time.strftime("%Y-%m-%d at %H:%M:%S")
+        scheduled_str = scheduled_time.strftime("%Y-%m-%d at %H:%M:%S %Z")
 
         logger.info(f"Scheduled message {message_id} for {scheduled_str}")
         return f"Scheduled to send '{message}' on {scheduled_str}"
@@ -348,6 +354,69 @@ async def send_scheduled_message(
     except Exception as e:
         logger.error(f"Error scheduling message: {e}")
         return f"Error scheduling message: {str(e)}"
+
+
+@homar.tool
+async def list_scheduled_messages(ctx: RunContext[MyDeps]) -> str:
+    """List all scheduled messages that are pending delivery.
+
+    Use this tool when the user wants to see what messages/actions are scheduled.
+    For example: "what messages are scheduled?" or "show me pending actions".
+
+    Returns:
+        A formatted list of all scheduled messages with their IDs, scheduled times, and content
+    """
+    scheduler = get_scheduler()
+    scheduled = scheduler.get_scheduled_messages()
+
+    if not scheduled:
+        return "No scheduled messages pending."
+
+    # Get timezone for display
+    tz = ZoneInfo(scheduler.get_default_timezone())
+    
+    result = []
+    result.append(f"Found {len(scheduled)} scheduled message(s):\n")
+    
+    for message_id, delayed_msg in scheduled:
+        # Format the scheduled time
+        scheduled_str = delayed_msg.scheduled_time.strftime("%Y-%m-%d %H:%M:%S %Z")
+        
+        # Extract the actual message (removing the DELAYED_COMMAND marker)
+        actual_message = delayed_msg.message
+        if actual_message.startswith("[DELAYED_COMMAND] "):
+            actual_message = actual_message[len("[DELAYED_COMMAND] "):]
+        
+        result.append(f"- ID: {message_id}")
+        result.append(f"  Time: {scheduled_str}")
+        result.append(f"  Message: {actual_message}")
+        result.append("")
+    
+    return "\n".join(result)
+
+
+@homar.tool
+async def cancel_scheduled_message(ctx: RunContext[MyDeps], message_id: str) -> str:
+    """Cancel a scheduled message that hasn't been sent yet.
+
+    Use this tool when the user wants to cancel a previously scheduled action.
+    For example: "cancel scheduled message delayed_1" or "cancel that reminder".
+
+    Args:
+        message_id: The ID of the scheduled message to cancel (e.g., "delayed_1" or "scheduled_1")
+
+    Returns:
+        Confirmation that the message was cancelled or an error if not found
+    """
+    scheduler = get_scheduler()
+    
+    success = scheduler.cancel_message(message_id)
+    
+    if success:
+        logger.info(f"Cancelled scheduled message {message_id}")
+        return f"Successfully cancelled scheduled message: {message_id}"
+    else:
+        return f"Could not find scheduled message with ID: {message_id}. Use list_scheduled_messages to see available IDs."
 
 
 async def run_homar_with_messages(

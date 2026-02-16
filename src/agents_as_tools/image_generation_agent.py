@@ -51,6 +51,7 @@ async def get_system_prompt(ctx: RunContext[MyDeps]) -> str:
         "{{guidelines}}", DEFAULT_COSMIC_GUIDELINES
     )
 
+
 def generate_image(prompt: str, short_image_title: str) -> str:
     """Use this tool to generate an image based on a text prompt."""
 

@@ -1,5 +1,5 @@
 import os
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, RunContext, DeferredToolRequests
 from pydantic_ai.mcp import MCPServerStreamableHTTP, MCPServerSSE
 import httpx
 import asyncio
@@ -47,6 +47,7 @@ settings = OpenAIResponsesModelSettings(
 homar = Agent(
     "openai:gpt-5-mini",
     deps_type=MyDeps,
+    output_type=str | DeferredToolRequests,
     instructions="Nazywasz się Homar. Jesteś domowym asystentem. Wykonuj polecenia użytkownika korzystając z swojej wiedzy i dostępnych narzędzi. Odpowiadaj krótko i zwięźle, nie oferuj dodatkowej pomocy i proponuj kolejnych działań. Jesteś dokładny i masz poczucie humoru. Jesteś domyślny, potrafisz zrozumieć polecenie nawet jeżeli nie było do końca sprecyzowane. Korzystaj z swojej wiedzy. Najczęściej będziesz musiał wykorzystać narzędzia do wykonania polecenia.",
     model_settings=settings,
 )
@@ -181,6 +182,22 @@ async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
         usage=ctx.usage,
     )
     return r.output
+
+
+@homar.tool_plain(requires_approval=True)
+def test_discord_approval(test_parameter: str) -> str:
+    """Test tool for Discord approval mechanism - this tool always requires user confirmation.
+
+    This is a simple test tool to demonstrate the approval workflow. When called,
+    it will require the user to approve or reject the action via Discord UI.
+
+    Args:
+        test_parameter: A test parameter to demonstrate how parameters are displayed for approval
+
+    Returns:
+        A success message if approved
+    """
+    return f"Test tool executed successfully with parameter: {test_parameter}"
 
 
 @homar.tool_plain
@@ -374,24 +391,24 @@ async def list_scheduled_messages(ctx: RunContext[MyDeps]) -> str:
 
     # Get timezone for display
     tz = ZoneInfo(scheduler.get_default_timezone())
-    
+
     result = []
     result.append(f"Found {len(scheduled)} scheduled message(s):\n")
-    
+
     for message_id, delayed_msg in scheduled:
         # Format the scheduled time
         scheduled_str = delayed_msg.scheduled_time.strftime("%Y-%m-%d %H:%M:%S %Z")
-        
+
         # Extract the actual message (removing the DELAYED_COMMAND marker)
         actual_message = delayed_msg.message
         if actual_message.startswith("[DELAYED_COMMAND] "):
-            actual_message = actual_message[len("[DELAYED_COMMAND] "):]
-        
+            actual_message = actual_message[len("[DELAYED_COMMAND] ") :]
+
         result.append(f"- ID: {message_id}")
         result.append(f"  Time: {scheduled_str}")
         result.append(f"  Message: {actual_message}")
         result.append("")
-    
+
     return "\n".join(result)
 
 
@@ -409,13 +426,13 @@ async def cancel_scheduled_message(ctx: RunContext[MyDeps], message_id: str) -> 
         Confirmation that the message was cancelled or an error if not found
     """
     scheduler = get_scheduler()
-    
+
     success = scheduler.cancel_message(message_id)
-    
+
     if success:
         logger.info(f"Cancelled scheduled message {message_id}")
         return f"Successfully cancelled scheduled message: {message_id}"
-    
+
     return f"Could not find scheduled message with ID: {message_id}. Use list_scheduled_messages to see available IDs."
 
 
@@ -437,7 +454,7 @@ async def run_homar(message: str, channel: str = None, deps: MyDeps = None) -> s
 
 async def run_homar_with_history(
     new_message: str, history: list[ModelMessage], deps: MyDeps = None
-) -> tuple[str, list[ModelMessage], list[str]]:
+) -> tuple[str | DeferredToolRequests, list[ModelMessage], list[str]]:
     if deps is None:
         deps = MyDeps()
     agent_response = await homar.run(new_message, message_history=history, deps=deps)

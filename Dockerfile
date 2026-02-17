@@ -2,6 +2,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Install Node.js and npm (required for npx and Google Calendar MCP server)
+RUN apt-get update && apt-get install -y \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install poetry
 RUN pip install poetry==2.2.1
 

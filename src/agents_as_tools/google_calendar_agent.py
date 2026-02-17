@@ -17,12 +17,8 @@ google_calendar_mcp_server = MCPServerStdio(
     "npx",
     args=["-y", "@cocal/google-calendar-mcp"],
     env={
-        "GOOGLE_OAUTH_CREDENTIALS": os.getenv(
-            "GOOGLE_OAUTH_CREDENTIALS"
-        ),
-        "GOOGLE_CALENDAR_MCP_TOKEN_PATH": os.getenv(
-            "GOOGLE_CALENDAR_MCP_TOKEN_PATH"
-        )
+        "GOOGLE_OAUTH_CREDENTIALS": os.getenv("GOOGLE_OAUTH_CREDENTIALS"),
+        "GOOGLE_CALENDAR_MCP_TOKEN_PATH": os.getenv("GOOGLE_CALENDAR_MCP_TOKEN_PATH"),
     },
 )
 

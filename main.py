@@ -15,12 +15,14 @@ from loguru import logger
 from dotenv import load_dotenv
 import logfire
 import uvicorn
+from pydantic_ai import DeferredToolRequests
 from src.models.schemas import MyDeps
 from src.agents_as_tools.image_generation_agent import (
     image_generation_agent,
     generate_image,
 )
 from src.homar import run_homar_with_history
+from src.discord_approval import request_approval
 import platform
 
 logfire.configure(send_to_logfire=True)
@@ -111,8 +113,10 @@ async def _get_thread_history(thread: discord.Thread) -> list:
 
     # Reverse to get chronological order (oldest first)
     result = list(reversed(messages))
-    logger.info(f"Fetched {len(result)} messages from thread {thread.id} ({thread.name})")
-    
+    logger.info(
+        f"Fetched {len(result)} messages from thread {thread.id} ({thread.name})"
+    )
+
     return result
 
 
@@ -181,9 +185,40 @@ async def on_message(message: discord.Message):
             )
 
             # Note: We ignore the updated history (_) as we fetch it fresh from Discord on each message
-            response_message, _, generated_images = await run_homar_with_history(
+            (
+                response_output,
+                new_messages,
+                generated_images,
+            ) = await run_homar_with_history(
                 new_message=actual_message, history=thread_history, deps=deps
             )
+
+            # Check if we got a deferred tool request (approval needed)
+            if isinstance(response_output, DeferredToolRequests):
+                logger.info(
+                    f"Agent requires approval for {len(response_output.approvals)} tool(s)"
+                )
+
+                # Request user approval via Discord UI
+                approval_results = await request_approval(thread, response_output)
+
+                # Continue the agent run with approval results
+                # Use the message history from the first run
+                from src.homar import homar
+
+                agent_response = await homar.run(
+                    message_history=new_messages,
+                    deferred_tool_results=approval_results,
+                    deps=deps,
+                )
+                response_message = agent_response.output
+
+                # Update generated images if any were created
+                if deps.generated_images:
+                    generated_images = deps.generated_images
+            else:
+                # Normal string response
+                response_message = response_output
 
             # Send text response
             await thread.send(response_message)

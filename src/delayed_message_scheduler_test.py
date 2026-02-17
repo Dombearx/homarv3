@@ -235,7 +235,7 @@ class TestDelayedMessageScheduler:
         # First get current time in Europe/Warsaw
         tz = ZoneInfo("Europe/Warsaw")
         current_time_in_tz = datetime.now(tz=tz)
-        
+
         # Create a naive datetime 1 second in the future
         # by taking the tz-aware time, adding 1 second, then removing tz info
         future_time_in_tz = current_time_in_tz + timedelta(seconds=1)

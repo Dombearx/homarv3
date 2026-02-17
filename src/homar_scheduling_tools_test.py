@@ -62,18 +62,18 @@ async def list_scheduled_messages_test_helper():
 
     result = []
     result.append(f"Found {len(scheduled)} scheduled message(s):\n")
-    
+
     for message_id, delayed_msg in scheduled:
         scheduled_str = delayed_msg.scheduled_time.strftime("%Y-%m-%d %H:%M:%S %Z")
         actual_message = delayed_msg.message
         if actual_message.startswith("[DELAYED_COMMAND] "):
-            actual_message = actual_message[len("[DELAYED_COMMAND] "):]
-        
+            actual_message = actual_message[len("[DELAYED_COMMAND] ") :]
+
         result.append(f"- ID: {message_id}")
         result.append(f"  Time: {scheduled_str}")
         result.append(f"  Message: {actual_message}")
         result.append("")
-    
+
     return "\n".join(result)
 
 
@@ -81,7 +81,7 @@ async def cancel_scheduled_message_test_helper(message_id):
     """Helper function that mimics cancel_scheduled_message behavior."""
     scheduler = get_scheduler()
     success = scheduler.cancel_message(message_id)
-    
+
     if success:
         return f"Successfully cancelled scheduled message: {message_id}"
     else:
@@ -111,7 +111,7 @@ class TestSchedulingTools:
     async def clear_scheduler(self):
         """Clear all scheduled messages before each test."""
         scheduler = get_scheduler()
-        
+
         # Cancel all existing messages and collect their tasks (BEFORE test)
         tasks_to_wait = []
         messages_before = list(scheduler.get_scheduled_messages())
@@ -119,7 +119,7 @@ class TestSchedulingTools:
             if delayed_msg.task and not delayed_msg.task.done():
                 tasks_to_wait.append(delayed_msg.task)
             scheduler.cancel_message(message_id)
-        
+
         # Wait for all cancelled tasks to complete
         for task in tasks_to_wait:
             try:
@@ -128,10 +128,10 @@ class TestSchedulingTools:
                 pass
             except Exception:
                 pass
-        
+
         # Extra wait to ensure cleanup completes
         await asyncio.sleep(0.2)
-        
+
         # Verify cleanup succeeded
         remaining = scheduler.get_scheduled_messages()
         if remaining:
@@ -139,9 +139,9 @@ class TestSchedulingTools:
             for message_id, _ in remaining:
                 scheduler.cancel_message(message_id)
             await asyncio.sleep(0.1)
-        
+
         yield
-        
+
         # Clean up after test
         tasks_to_wait = []
         messages_after = list(scheduler.get_scheduled_messages())
@@ -149,7 +149,7 @@ class TestSchedulingTools:
             if delayed_msg.task and not delayed_msg.task.done():
                 tasks_to_wait.append(delayed_msg.task)
             scheduler.cancel_message(message_id)
-        
+
         # Wait for all cancelled tasks to complete
         for task in tasks_to_wait:
             try:
@@ -158,7 +158,7 @@ class TestSchedulingTools:
                 pass
             except Exception:
                 pass
-        
+
         # Extra wait to ensure cleanup completes
         await asyncio.sleep(0.2)
 
@@ -174,9 +174,9 @@ class TestSchedulingTools:
         # Schedule messages
         await send_delayed_message_test_helper(deps, "Test message 1", 0, 0, 10)
         await send_delayed_message_test_helper(deps, "Test message 2", 0, 0, 20)
-        
+
         result = await list_scheduled_messages_test_helper()
-        
+
         assert "Found 2 scheduled message(s)" in result
         assert "Test message 1" in result
         assert "Test message 2" in result
@@ -187,25 +187,25 @@ class TestSchedulingTools:
         """Test cancelling a scheduled message."""
         # Schedule a message
         await send_delayed_message_test_helper(deps, "Test message", 0, 0, 10)
-        
+
         # Get message_id from scheduler
         scheduler = get_scheduler()
         messages = scheduler.get_scheduled_messages()
         assert len(messages) == 1
         message_id = messages[0][0]
-        
+
         # Cancel the message
         result = await cancel_scheduled_message_test_helper(message_id)
-        
+
         assert f"Successfully cancelled scheduled message: {message_id}" in result
-        
+
         # Wait a moment for async cleanup to complete
         await asyncio.sleep(0.5)
-        
+
         # Verify it was cancelled
         messages = scheduler.get_scheduled_messages()
         assert len(messages) == 0
-        
+
         # Verify the callback was never called (message was successfully cancelled)
         assert len(mock_callback.calls) == 0
 
@@ -222,7 +222,7 @@ class TestSchedulingTools:
         result = await send_delayed_message_test_helper(deps, "Test", 0, 0, 0)
         assert "Error" in result
         assert "at least 1 second" in result
-        
+
         # Test with negative values
         result = await send_delayed_message_test_helper(deps, "Test", -1, 0, 0)
         assert "Error" in result

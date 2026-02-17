@@ -52,6 +52,7 @@ async def add_devices_info(ctx: RunContext) -> str:
 
 if __name__ == "__main__":
     import asyncio
+
     # test
     async def main():
         r = await grocy_agent.run(

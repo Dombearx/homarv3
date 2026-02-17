@@ -173,4 +173,3 @@ class TestToolApprovalIntegration:
         assert hasattr(request, "metadata")
         assert len(request.approvals) == 1
         assert request.approvals[0].tool_call_id == "call_id"
-

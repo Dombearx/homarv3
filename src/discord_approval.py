@@ -5,7 +5,7 @@ import discord
 from discord.ui import View, Button
 from loguru import logger
 from typing import Dict, Tuple
-from pydantic_ai import DeferredToolRequests, DeferredToolResults
+from pydantic_ai import DeferredToolRequests, DeferredToolResults, ToolDenied
 
 
 # Global storage for pending approvals
@@ -73,8 +73,6 @@ class ApprovalView(View):
         deferred_requests, future = pending_approvals[self.message_id]
 
         # Build approval results - reject all requests
-        from pydantic_ai import ToolDenied
-
         results = DeferredToolResults()
         for call in deferred_requests.approvals:
             results.approvals[call.tool_call_id] = ToolDenied(
@@ -169,8 +167,6 @@ async def request_approval(
         logger.warning(f"Tool approval {approval_message.id} timed out")
 
         # Return rejection for all tools on timeout
-        from pydantic_ai import ToolDenied
-
         results = DeferredToolResults()
         for call in deferred_requests.approvals:
             results.approvals[call.tool_call_id] = ToolDenied(

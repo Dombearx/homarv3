@@ -21,7 +21,7 @@ In any Discord channel where Homar is active, send:
 or
 
 ```
-@Homar call test_discord_approval with test_parameter "my test value"
+@Homar call approval_test_tool with test_parameter "my test value"
 ```
 
 ### Expected Behavior:
@@ -33,7 +33,7 @@ or
 🔔 **Tool Approval Required**
 The following tools require your confirmation:
 
-**Tool:** `test_discord_approval`
+**Tool:** `approval_test_tool`
 **Parameters:**
   • test_parameter: `hello world`
 
@@ -123,7 +123,7 @@ After 5 minutes:
 Test with more complex parameters:
 
 ```
-@Homar run test_discord_approval with a very long parameter value: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+@Homar run approval_test_tool with a very long parameter value: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
 ```
 
 ### Expected Behavior:
@@ -211,7 +211,7 @@ Tool approval 123456789 timed out
 - Tool not registered properly
 
 **Solution:**
-- Use exact phrases like "test approval tool" or "test_discord_approval"
+- Use exact phrases like "test approval tool" or "approval_test_tool"
 - Check that tool is imported and decorated correctly
 
 ## Automated Tests

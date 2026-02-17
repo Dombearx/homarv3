@@ -2,25 +2,23 @@
 
 import pytest
 from pydantic_ai import DeferredToolRequests, DeferredToolResults, ToolCallPart
-from src.homar import test_discord_approval
+from src.homar import approval_test_tool
 from src.models.schemas import MyDeps
 
 
 class TestToolApprovalFlow:
     """Tests for the tool approval functionality."""
 
-    def test_discord_approval_tool_exists(self):
-        """Verify the test_discord_approval tool function exists."""
+    def test_approval_test_tool_exists(self):
+        """Verify the approval_test_tool function exists."""
         # Import the tool function directly
-        from src.homar import test_discord_approval
+        from src.homar import approval_test_tool
 
         # Verify it's callable
-        assert callable(test_discord_approval), (
-            "test_discord_approval should be callable"
-        )
+        assert callable(approval_test_tool), "approval_test_tool should be callable"
 
         # Test direct call
-        result = test_discord_approval("test_param")
+        result = approval_test_tool("test_param")
         assert "successfully" in result.lower()
         assert "test_param" in result
 
@@ -28,10 +26,10 @@ class TestToolApprovalFlow:
 class TestApprovalToolBehavior:
     """Test the behavior of tools with approval requirements."""
 
-    def test_test_discord_approval_direct_call(self):
-        """Test direct call to test_discord_approval (outside agent context)."""
+    def test_approval_tool_direct_call(self):
+        """Test direct call to approval_test_tool (outside agent context)."""
         # This should work when called directly (bypasses approval since it's already approved)
-        result = test_discord_approval("direct_call_test")
+        result = approval_test_tool("direct_call_test")
 
         assert "successfully" in result.lower()
         assert "direct_call_test" in result
@@ -49,12 +47,12 @@ class TestApprovalToolBehavior:
             calls=[],
             approvals=[
                 ToolCallPart(
-                    tool_name="test_discord_approval",
+                    tool_name="approval_test_tool",
                     args={"test_parameter": "test1"},
                     tool_call_id="call_1",
                 ),
                 ToolCallPart(
-                    tool_name="test_discord_approval",
+                    tool_name="approval_test_tool",
                     args={"test_parameter": "test2"},
                     tool_call_id="call_2",
                 ),
@@ -64,8 +62,7 @@ class TestApprovalToolBehavior:
         # Verify structure
         assert len(mock_deferred.approvals) == 2
         assert all(
-            call.tool_name == "test_discord_approval"
-            for call in mock_deferred.approvals
+            call.tool_name == "approval_test_tool" for call in mock_deferred.approvals
         )
 
         # Create approval results

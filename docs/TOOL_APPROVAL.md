@@ -59,7 +59,7 @@ When a tool requiring approval is called:
 🔔 **Tool Approval Required**
 The following tools require your confirmation:
 
-**Tool:** `test_discord_approval`
+**Tool:** `approval_test_tool`
 **Parameters:**
   • test_parameter: `test_value`
 
@@ -120,7 +120,7 @@ A test tool is included for verifying the approval mechanism:
 
 ```python
 @homar.tool_plain(requires_approval=True)
-def test_discord_approval(test_parameter: str) -> str:
+def approval_test_tool(test_parameter: str) -> str:
     """Test tool for Discord approval mechanism."""
     return f"Test tool executed successfully with parameter: {test_parameter}"
 ```

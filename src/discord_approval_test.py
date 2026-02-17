@@ -21,7 +21,7 @@ def sample_deferred_request():
         calls=[],
         approvals=[
             ToolCallPart(
-                tool_name="test_discord_approval",
+                tool_name="approval_test_tool",
                 args={"test_parameter": "test_value"},
                 tool_call_id="test_call_1",
             )
@@ -57,7 +57,7 @@ class TestRequestApproval:
         # Check message content
         message_content = call_args[0][0]
         assert "Tool Approval Required" in message_content
-        assert "test_discord_approval" in message_content
+        assert "approval_test_tool" in message_content
         assert "test_parameter" in message_content
         assert "test_value" in message_content
 

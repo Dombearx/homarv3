@@ -185,7 +185,7 @@ async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
 
 
 @homar.tool_plain(requires_approval=True)
-def test_discord_approval(test_parameter: str) -> str:
+def approval_test_tool(test_parameter: str) -> str:
     """Test tool for Discord approval mechanism - this tool always requires user confirmation.
 
     This is a simple test tool to demonstrate the approval workflow. When called,

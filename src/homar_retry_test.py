@@ -55,7 +55,7 @@ class TestToolRetryConfiguration:
         """Verify all API tools are registered with the agent."""
         from src.homar import homar
 
-        tool_names = [tool.name for tool in homar._function_tools.values()]
+        tool_names = [tool.name for tool in homar._function_toolset.values()]
 
         # Check that key API tools exist
         expected_tools = [

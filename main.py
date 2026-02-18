@@ -15,7 +15,7 @@ from loguru import logger
 from dotenv import load_dotenv
 import logfire
 import uvicorn
-from pydantic_ai import DeferredToolRequests
+from pydantic_ai import DeferredToolRequests, UnexpectedModelBehavior
 from src.models.schemas import MyDeps
 from src.agents_as_tools.image_generation_agent import (
     image_generation_agent,
@@ -234,6 +234,17 @@ async def on_message(message: discord.Message):
                             logger.warning(f"Image file not found: {image_path}")
                     except Exception as img_error:
                         logger.error(f"Failed to send image {image_path}: {img_error}")
+    except UnexpectedModelBehavior as e:
+        # Handle case where tool retries are exhausted
+        logger.error(f"Tool retry limit exceeded: {e}")
+        try:
+            error_message = "Nie udało mi się wykonać tej operacji pomimo kilku prób. Proszę spróbować ponownie z innym sformułowaniem lub podać więcej szczegółów."
+            if e.__cause__:
+                # Include the underlying error context if available
+                logger.error(f"Underlying cause: {e.__cause__}")
+            await thread.send(error_message)
+        except Exception as send_error:
+            logger.error(f"Failed to send retry error message: {send_error}")
     except Exception as e:
         logger.error(f"Error processing message: {e}")
         try:

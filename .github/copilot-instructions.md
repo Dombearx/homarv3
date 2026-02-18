@@ -6,8 +6,10 @@ This is a Python-based Discord bot named "Homar" (Polish-speaking home assistant
 
 ### Required Before Each Commit
 - Run `make format` before committing any changes to ensure proper code formatting
-- Run `make test` before committing any changes to ensure nothing got broken during developement
 - This will run `ruff format` on all Python files to maintain consistent style
+- Run `make test` before committing any changes to ensure nothing got broken during developement
+- If any tests fail, fix the code before commiting
+
 
 ### Development Flow
 - **Format code**: `make format`

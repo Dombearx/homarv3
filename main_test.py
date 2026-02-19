@@ -69,7 +69,9 @@ class TestGetActualMessage:
         mock_message.attachments = []
 
         result = _get_actual_message(mock_message, is_delayed_command=False)
-        assert result == "Hello, world!"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0] == "Hello, world!"
 
     def test_get_actual_message_delayed(self):
         """Test getting message content from delayed command."""
@@ -78,7 +80,9 @@ class TestGetActualMessage:
         mock_message.attachments = []
 
         result = _get_actual_message(mock_message, is_delayed_command=True)
-        assert result == "Turn off the lights"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0] == "Turn off the lights"
 
     def test_get_actual_message_delayed_with_extra_spaces(self):
         """Test delayed message strips extra spaces."""
@@ -87,7 +91,9 @@ class TestGetActualMessage:
         mock_message.attachments = []
 
         result = _get_actual_message(mock_message, is_delayed_command=True)
-        assert result == "Turn off the lights"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0] == "Turn off the lights"
 
     def test_get_actual_message_delayed_multiword(self):
         """Test delayed message with complex content."""
@@ -98,7 +104,9 @@ class TestGetActualMessage:
         mock_message.attachments = []
 
         result = _get_actual_message(mock_message, is_delayed_command=True)
-        assert result == "This is a complex message with many words"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0] == "This is a complex message with many words"
 
     def test_get_actual_message_with_image(self):
         """Test message with image attachment."""
@@ -173,4 +181,18 @@ class TestGetActualMessage:
         result = _get_actual_message(mock_message, is_delayed_command=False)
 
         # Non-image attachments should be ignored
-        assert result == "Here's a PDF"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0] == "Here's a PDF"
+
+    def test_get_actual_message_empty(self):
+        """Test message with no content."""
+        mock_message = Mock()
+        mock_message.content = ""
+        mock_message.attachments = []
+
+        result = _get_actual_message(mock_message, is_delayed_command=False)
+
+        # Empty message should return empty list
+        assert isinstance(result, list)
+        assert len(result) == 0

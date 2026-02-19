@@ -6,9 +6,11 @@ from src.agents_as_tools.humblebundle_agent import (
     list_bundles,
     get_bundle_details,
     _get_category,
-    _find_matching_url,
+    _find_matching_bundle,
     _extract_bundle_metadata,
+    _extract_price_tiers,
     _format_bundle_list,
+    _get_bundles_data,
 )
 
 
@@ -145,17 +147,17 @@ class TestGetBundleDetails:
     """Test the get_bundle_details function."""
 
     @patch("src.agents_as_tools.humblebundle_agent.httpx.get")
-    @patch("src.agents_as_tools.humblebundle_agent.list_bundles")
-    def test_get_bundle_details_success(self, mock_list, mock_get):
+    @patch("src.agents_as_tools.humblebundle_agent._get_bundles_data")
+    def test_get_bundle_details_success(self, mock_get_bundles, mock_get):
         """Test successful bundle detail retrieval."""
-        # Mock list_bundles to return a bundle
-        mock_list.return_value = """
-        Found 1 active bundles:
-        
-        • Test Bundle
-          Type: games
-          Link: https://www.humblebundle.com/games/test-bundle
-        """
+        # Mock _get_bundles_data to return a bundle
+        mock_get_bundles.return_value = [
+            {
+                "name": "Test Bundle",
+                "category": "games",
+                "url": "https://www.humblebundle.com/games/test-bundle",
+            }
+        ]
 
         # Mock detail page response
         mock_html = """
@@ -164,6 +166,12 @@ class TestGetBundleDetails:
         <meta property="og:title" content="Test Bundle">
         <meta property="og:description" content="A great test bundle">
         </head>
+        <body>
+        <script>
+        var data = {"amount": 15.00}, "currency": "USD"};
+        var data2 = {"amount": 25.00}, "currency": "USD"};
+        </script>
+        </body>
         </html>
         """
 
@@ -176,25 +184,30 @@ class TestGetBundleDetails:
 
         assert "Test Bundle" in result
         assert "https://www.humblebundle.com" in result
+        assert "games" in result
 
-    @patch("src.agents_as_tools.humblebundle_agent.list_bundles")
-    def test_get_bundle_details_not_found(self, mock_list):
+    @patch("src.agents_as_tools.humblebundle_agent._get_bundles_data")
+    def test_get_bundle_details_not_found(self, mock_get_bundles):
         """Test when bundle is not found."""
-        mock_list.return_value = "Found 0 bundles"
+        mock_get_bundles.return_value = []
 
         result = get_bundle_details("nonexistent")
 
         assert "not found" in result.lower()
 
     @patch("src.agents_as_tools.humblebundle_agent.httpx.get")
-    @patch("src.agents_as_tools.humblebundle_agent.list_bundles")
-    def test_get_bundle_details_http_error(self, mock_list, mock_get):
+    @patch("src.agents_as_tools.humblebundle_agent._get_bundles_data")
+    def test_get_bundle_details_http_error(self, mock_get_bundles, mock_get):
         """Test handling of HTTP errors when fetching details."""
         import httpx
 
-        mock_list.return_value = """
-        Link: https://www.humblebundle.com/games/test
-        """
+        mock_get_bundles.return_value = [
+            {
+                "name": "Test Bundle",
+                "category": "games",
+                "url": "https://www.humblebundle.com/games/test",
+            }
+        ]
         mock_get.side_effect = httpx.HTTPError("Connection failed")
 
         result = get_bundle_details("test")
@@ -223,47 +236,91 @@ class TestGetCategory:
         assert _get_category("/other/example") == "bundle"
 
 
-class TestFindMatchingUrl:
-    """Test the _find_matching_url helper function."""
+class TestFindMatchingBundle:
+    """Test the _find_matching_bundle helper function."""
 
-    def test_find_matching_url_exact_match(self):
-        """Test finding URL with exact name match."""
-        urls = [
-            "https://www.humblebundle.com/games/test-bundle",
-            "https://www.humblebundle.com/books/other-bundle",
+    def test_find_matching_bundle_exact_match(self):
+        """Test finding bundle with exact name match."""
+        bundles = [
+            {
+                "name": "Test Bundle",
+                "category": "games",
+                "url": "https://www.humblebundle.com/games/test-bundle",
+            },
+            {
+                "name": "Other Bundle",
+                "category": "books",
+                "url": "https://www.humblebundle.com/books/other-bundle",
+            },
         ]
-        result = _find_matching_url("test", urls)
-        assert result == "https://www.humblebundle.com/games/test-bundle"
+        result = _find_matching_bundle("Test Bundle", bundles)
+        assert result is not None
+        assert result["name"] == "Test Bundle"
 
-    def test_find_matching_url_partial_match(self):
-        """Test finding URL with partial name match."""
-        urls = [
-            "https://www.humblebundle.com/games/awesome-rpg-bundle",
-            "https://www.humblebundle.com/books/python-books",
+    def test_find_matching_bundle_case_insensitive(self):
+        """Test finding bundle with case-insensitive match."""
+        bundles = [
+            {
+                "name": "Test Bundle",
+                "category": "games",
+                "url": "https://www.humblebundle.com/games/test-bundle",
+            }
         ]
-        result = _find_matching_url("rpg", urls)
-        assert result == "https://www.humblebundle.com/games/awesome-rpg-bundle"
+        result = _find_matching_bundle("test bundle", bundles)
+        assert result is not None
+        assert result["name"] == "Test Bundle"
 
-    def test_find_matching_url_word_match(self):
-        """Test finding URL with word-based matching."""
-        urls = [
-            "https://www.humblebundle.com/games/fallout-tabletop",
-            "https://www.humblebundle.com/books/programming",
+    def test_find_matching_bundle_partial_match(self):
+        """Test finding bundle with partial name match."""
+        bundles = [
+            {
+                "name": "Humble RPG Bundle: Awesome Games",
+                "category": "games",
+                "url": "https://www.humblebundle.com/games/awesome-rpg-bundle",
+            },
+            {
+                "name": "Humble Book Bundle: Programming",
+                "category": "books",
+                "url": "https://www.humblebundle.com/books/programming",
+            },
         ]
-        result = _find_matching_url("fallout", urls)
-        assert result == "https://www.humblebundle.com/games/fallout-tabletop"
+        result = _find_matching_bundle("RPG", bundles)
+        assert result is not None
+        assert "RPG" in result["name"]
 
-    def test_find_matching_url_not_found(self):
-        """Test when no matching URL is found."""
-        urls = [
-            "https://www.humblebundle.com/games/test-bundle",
+    def test_find_matching_bundle_word_match(self):
+        """Test finding bundle with word-based matching."""
+        bundles = [
+            {
+                "name": "Humble Game Bundle: Fallout Tabletop",
+                "category": "games",
+                "url": "https://www.humblebundle.com/games/fallout-tabletop",
+            },
+            {
+                "name": "Humble Book Bundle: Programming",
+                "category": "books",
+                "url": "https://www.humblebundle.com/books/programming",
+            },
         ]
-        result = _find_matching_url("nonexistent", urls)
+        result = _find_matching_bundle("Fallout Tabletop", bundles)
+        assert result is not None
+        assert "Fallout" in result["name"]
+
+    def test_find_matching_bundle_not_found(self):
+        """Test when no matching bundle is found."""
+        bundles = [
+            {
+                "name": "Test Bundle",
+                "category": "games",
+                "url": "https://www.humblebundle.com/games/test-bundle",
+            }
+        ]
+        result = _find_matching_bundle("nonexistent", bundles)
         assert result is None
 
-    def test_find_matching_url_empty_list(self):
-        """Test with empty URL list."""
-        result = _find_matching_url("test", [])
+    def test_find_matching_bundle_empty_list(self):
+        """Test with empty bundle list."""
+        result = _find_matching_bundle("test", [])
         assert result is None
 
 
@@ -316,6 +373,50 @@ class TestExtractBundleMetadata:
         result = _extract_bundle_metadata(html, "Fallback Name")
         assert result["title"] == "Fallback Name"
         assert result["description"] == "No description available"
+
+
+class TestExtractPriceTiers:
+    """Test the _extract_price_tiers helper function."""
+
+    def test_extract_price_tiers_with_amounts(self):
+        """Test extracting price tiers with amount_usd."""
+        html = """
+        <html>
+        <body>
+        <script>
+        var data = {"amount_usd": 15.00};
+        var data2 = {"amount_usd": 25.00};
+        var data3 = {"amount_usd": 35.00};
+        </script>
+        </body>
+        </html>
+        """
+        result = _extract_price_tiers(html)
+        assert len(result) > 0
+        # Check that at least one tier was extracted
+        assert any("$" in tier.get("price", "") for tier in result)
+
+    def test_extract_price_tiers_with_pay_what_you_want(self):
+        """Test extracting price tiers from pay-what-you-want structure."""
+        html = """
+        <html>
+        <body>
+        <script>
+        var data = {"price|money": {"currency": "USD", "amount": 16.00}};
+        var data2 = {"price|money": {"currency": "USD", "amount": 25.00}};
+        </script>
+        </body>
+        </html>
+        """
+        result = _extract_price_tiers(html)
+        assert len(result) > 0
+
+    def test_extract_price_tiers_no_data(self):
+        """Test extracting price tiers when no data available."""
+        html = "<html><body></body></html>"
+        result = _extract_price_tiers(html)
+        assert isinstance(result, list)
+        # May be empty or have minimal data
 
 
 class TestFormatBundleList:

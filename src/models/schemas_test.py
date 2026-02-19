@@ -2,9 +2,8 @@
 
 from src.models.schemas import (
     UserType,
-    USER_REGISTRY,
     GUEST_ALLOWED_TOOLS,
-    get_user_type,
+    get_user_type_from_discord_roles,
     MyDeps,
 )
 
@@ -35,29 +34,41 @@ class TestGuestAllowedTools:
             assert tool not in GUEST_ALLOWED_TOOLS
 
 
-class TestGetUserType:
-    """Test the get_user_type helper."""
+class TestGetUserTypeFromDiscordRoles:
+    """Test the get_user_type_from_discord_roles helper."""
 
-    def setup_method(self):
-        USER_REGISTRY.clear()
+    def test_no_roles_defaults_to_default(self):
+        assert get_user_type_from_discord_roles([]) == UserType.DEFAULT
 
-    def teardown_method(self):
-        USER_REGISTRY.clear()
+    def test_unrelated_roles_default_to_default(self):
+        assert (
+            get_user_type_from_discord_roles(["member", "booster"]) == UserType.DEFAULT
+        )
 
-    def test_unknown_user_defaults_to_default(self):
-        assert get_user_type("somebody") == UserType.DEFAULT
+    def test_admin_role_returns_admin(self):
+        assert get_user_type_from_discord_roles(["admin"]) == UserType.ADMIN
 
-    def test_registered_admin(self):
-        USER_REGISTRY["alice"] = UserType.ADMIN
-        assert get_user_type("alice") == UserType.ADMIN
+    def test_admin_role_case_insensitive(self):
+        assert get_user_type_from_discord_roles(["Admin"]) == UserType.ADMIN
+        assert get_user_type_from_discord_roles(["ADMIN"]) == UserType.ADMIN
 
-    def test_registered_guest(self):
-        USER_REGISTRY["bob"] = UserType.GUEST
-        assert get_user_type("bob") == UserType.GUEST
+    def test_guest_role_returns_guest(self):
+        assert get_user_type_from_discord_roles(["guest"]) == UserType.GUEST
 
-    def test_registered_default(self):
-        USER_REGISTRY["carol"] = UserType.DEFAULT
-        assert get_user_type("carol") == UserType.DEFAULT
+    def test_guest_role_case_insensitive(self):
+        assert get_user_type_from_discord_roles(["Guest"]) == UserType.GUEST
+
+    def test_admin_takes_priority_over_guest(self):
+        assert get_user_type_from_discord_roles(["guest", "admin"]) == UserType.ADMIN
+
+    def test_admin_with_other_roles(self):
+        assert (
+            get_user_type_from_discord_roles(["member", "Admin", "booster"])
+            == UserType.ADMIN
+        )
+
+    def test_guest_with_other_roles(self):
+        assert get_user_type_from_discord_roles(["member", "Guest"]) == UserType.GUEST
 
 
 class TestMyDeps:

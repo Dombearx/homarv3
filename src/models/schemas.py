@@ -1,7 +1,5 @@
 """Pydantic models for Homarv3 API."""
 
-import json
-import os
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum, auto
@@ -29,39 +27,26 @@ class UserType(StrEnum):
 # Tools accessible to Guest users (restricted accounts)
 GUEST_ALLOWED_TOOLS: set[str] = {"home_assistant_api"}
 
+# Discord role name → UserType mapping (case-insensitive).
+# The first match in priority order (ADMIN > DEFAULT > GUEST) wins.
+_DISCORD_ROLE_MAP: dict[str, UserType] = {
+    "admin": UserType.ADMIN,
+    "guest": UserType.GUEST,
+}
 
-def _load_user_registry() -> dict[str, UserType]:
-    """Load user registry from the HOMAR_USER_REGISTRY environment variable.
 
-    The variable should be a JSON object mapping Discord display_name to a
-    user type string ("admin", "default" or "guest"), e.g.:
-        HOMAR_USER_REGISTRY={"alice": "admin", "guest_user": "guest"}
+def get_user_type_from_discord_roles(role_names: list[str]) -> UserType:
+    """Derive a UserType from a Discord member's role names.
 
-    Unknown usernames fall back to DEFAULT at lookup time.
+    Roles are matched case-insensitively against the known role names.
+    ADMIN takes priority over GUEST; members with no matching role get DEFAULT.
     """
-    raw = os.getenv("HOMAR_USER_REGISTRY", "")
-    if not raw:
-        return {}
-    try:
-        data = json.loads(raw)
-        return {name: UserType(role.lower()) for name, role in data.items()}
-    except (json.JSONDecodeError, ValueError) as exc:
-        import warnings
-
-        warnings.warn(
-            f"HOMAR_USER_REGISTRY could not be parsed and will be ignored: {exc}",
-            stacklevel=2,
-        )
-        return {}
-
-
-# Registry mapping Discord display_name → UserType, loaded from env at startup.
-USER_REGISTRY: dict[str, UserType] = _load_user_registry()
-
-
-def get_user_type(username: str) -> UserType:
-    """Return the UserType for a Discord username, defaulting to DEFAULT."""
-    return USER_REGISTRY.get(username, UserType.DEFAULT)
+    lower_roles = {name.lower() for name in role_names}
+    if "admin" in lower_roles:
+        return UserType.ADMIN
+    if "guest" in lower_roles:
+        return UserType.GUEST
+    return UserType.DEFAULT
 
 
 class InteractRequest(BaseModel):

@@ -65,6 +65,12 @@ homarv3/
    OPENAI_API_KEY=your_openai_api_key
    GOOGLE_CALENDAR_CREDENTIALS_PATH=/path/to/credentials.json
    # Add other required tokens
+
+   # Optional: map Discord display_name → user type (admin/default/guest)
+   # Users not listed here default to "default" (same access as admin — all tools available).
+   # Guests have access only to the Home Assistant tool.
+   # Example: HOMAR_USER_REGISTRY={"alice": "admin", "guest_user": "guest"}
+   HOMAR_USER_REGISTRY={}
    ```
 
 5. **Set up Google Calendar credentials** (if using Google Calendar integration):

@@ -1,5 +1,7 @@
 """Pydantic models for Homarv3 API."""
 
+import json
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum, auto
@@ -27,9 +29,34 @@ class UserType(StrEnum):
 # Tools accessible to Guest users (restricted accounts)
 GUEST_ALLOWED_TOOLS: set[str] = {"home_assistant_api"}
 
-# Registry mapping Discord usernames to user types.
-# Unknown users fall back to DEFAULT.
-USER_REGISTRY: dict[str, UserType] = {}
+
+def _load_user_registry() -> dict[str, UserType]:
+    """Load user registry from the HOMAR_USER_REGISTRY environment variable.
+
+    The variable should be a JSON object mapping Discord display_name to a
+    user type string ("admin", "default" or "guest"), e.g.:
+        HOMAR_USER_REGISTRY={"alice": "admin", "guest_user": "guest"}
+
+    Unknown usernames fall back to DEFAULT at lookup time.
+    """
+    raw = os.getenv("HOMAR_USER_REGISTRY", "")
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+        return {name: UserType(role.lower()) for name, role in data.items()}
+    except (json.JSONDecodeError, ValueError) as exc:
+        import warnings
+
+        warnings.warn(
+            f"HOMAR_USER_REGISTRY could not be parsed and will be ignored: {exc}",
+            stacklevel=2,
+        )
+        return {}
+
+
+# Registry mapping Discord display_name → UserType, loaded from env at startup.
+USER_REGISTRY: dict[str, UserType] = _load_user_registry()
 
 
 def get_user_type(username: str) -> UserType:

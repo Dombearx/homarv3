@@ -72,23 +72,38 @@ def _get_category(product_url: str) -> str:
     return "bundle"
 
 
-def _find_matching_url(bundle_name: str, urls: list[str]) -> str | None:
+def _find_matching_bundle(bundle_name: str, bundles: list[dict]) -> dict | None:
     """
-    Find a matching bundle URL based on the bundle name.
+    Find a matching bundle based on the bundle name.
 
     Args:
         bundle_name: The name or partial name of the bundle to find
-        urls: List of bundle URLs to search through
+        bundles: List of bundle dictionaries with 'name', 'category', and 'url' keys
 
     Returns:
-        The matching URL or None if not found
+        The matching bundle dict or None if not found
     """
     name_lower = bundle_name.lower()
-    for url in urls:
-        if name_lower in url.lower() or any(
-            word in url.lower() for word in name_lower.split()
-        ):
-            return url
+
+    # First try exact match (case insensitive)
+    for bundle in bundles:
+        if name_lower == bundle["name"].lower():
+            return bundle
+
+    # Then try substring match
+    for bundle in bundles:
+        if name_lower in bundle["name"].lower():
+            return bundle
+
+    # Finally try word-based matching
+    search_words = set(name_lower.split())
+    for bundle in bundles:
+        bundle_words = set(bundle["name"].lower().split())
+        # If at least 2 words match (or all search words if less than 2), consider it a match
+        matching_words = search_words & bundle_words
+        if len(matching_words) >= min(2, len(search_words)):
+            return bundle
+
     return None
 
 
@@ -116,6 +131,78 @@ def _extract_bundle_metadata(html: str, bundle_name: str) -> dict:
     return {"title": title, "description": description}
 
 
+def _extract_price_tiers(html: str) -> list[dict]:
+    """
+    Extract price tier information from bundle HTML.
+
+    Args:
+        html: The HTML content of the bundle page
+
+    Returns:
+        List of tier dictionaries with 'price' and 'item_count' keys.
+        Returns empty list if no tiers found.
+    """
+    tiers = []
+
+    try:
+        # Look for tier pricing structure in the HTML
+        # Pattern 1: Look for price amounts with USD currency
+        tier_price_pattern = r'"amount":\s*([\d.]+)\}.*?"currency":\s*"USD"'
+        price_matches = re.findall(tier_price_pattern, html, re.DOTALL)
+
+        # Pattern 2: Look for tier item counts
+        # Search for tier_item_machine_names arrays
+        tier_items_pattern = r'"tier_item_machine_names":\s*\[(.*?)\]'
+        tier_items_matches = re.findall(tier_items_pattern, html, re.DOTALL)
+
+        # If we found tier items, count them
+        if tier_items_matches:
+            for items_str in tier_items_matches:
+                items = [x.strip() for x in items_str.split(",") if x.strip()]
+                item_count = len(items)
+                if item_count > 0:
+                    # This represents a tier with items
+                    tiers.append(
+                        {
+                            "price": None,  # Price not associated yet
+                            "item_count": item_count,
+                        }
+                    )
+
+        # Pattern 3: Look for structured tier data with amounts
+        structured_tier_pattern = r'"amount_usd":\s*([\d.]+)'
+        amount_matches = re.findall(structured_tier_pattern, html)
+
+        # Use structured amounts if found
+        if amount_matches:
+            unique_amounts = sorted(set(float(x) for x in amount_matches))
+            tiers = []
+            for amount in unique_amounts:
+                tiers.append(
+                    {
+                        "price": f"${amount:.2f}",
+                        "item_count": None,  # Item count not easily associated
+                    }
+                )
+
+        # Pattern 4: Extract from pay-what-you-want structure
+        # Look for suggested prices
+        suggested_pattern = (
+            r'"price\|money":\s*\{"currency":\s*"USD",\s*"amount":\s*([\d.]+)\}'
+        )
+        suggested_matches = re.findall(suggested_pattern, html)
+
+        if suggested_matches and not tiers:
+            unique_prices = sorted(set(float(x) for x in suggested_matches))
+            for price in unique_prices:
+                tiers.append({"price": f"${price:.2f}", "item_count": None})
+
+    except Exception as e:
+        logger.error(f"Error extracting price tiers: {e}")
+
+    return tiers
+
+
 def _format_bundle_list(bundles: list[dict]) -> str:
     """
     Format a list of bundles into a human-readable string.
@@ -134,6 +221,58 @@ def _format_bundle_list(bundles: list[dict]) -> str:
     return result
 
 
+def _get_bundles_data(bundle_type: str = "all") -> list[dict]:
+    """
+    Get raw bundle data from HumbleBundle.com.
+
+    Args:
+        bundle_type: Type of bundles to get: "all", "games", "books", or "software"
+
+    Returns:
+        List of bundle dictionaries with 'name', 'category', and 'url' keys.
+    """
+    url = "https://www.humblebundle.com/bundles"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+
+    response = httpx.get(url, headers=headers, timeout=30.0, follow_redirects=True)
+    response.raise_for_status()
+
+    html = response.text
+
+    bundles = []
+
+    # Extract bundle data from JSON in the page
+    # Extract tile names and product URLs separately (they appear in the same order)
+    tile_names = [m.group(1) for m in re.finditer(r'"tile_name":\s*"([^"]+)"', html)]
+    product_urls = [
+        m.group(1) for m in re.finditer(r'"product_url":\s*"([^"]+)"', html)
+    ]
+
+    # Pair them up - they should be in the same order
+    seen_names = set()
+    for tile_name, product_url in zip(tile_names, product_urls):
+        # Clean up the data
+        tile_name = tile_name.strip()
+        if tile_name and tile_name not in seen_names:
+            seen_names.add(tile_name)
+
+            # Build full URL
+            bundle_url = f"https://www.humblebundle.com{product_url}"
+
+            # Determine category from URL
+            category = _get_category(product_url)
+
+            # Filter by bundle type if specified
+            if bundle_type != "all" and category != bundle_type:
+                continue
+
+            bundles.append({"name": tile_name, "category": category, "url": bundle_url})
+
+    return bundles
+
+
 @humblebundle_agent.tool_plain
 def list_bundles(bundle_type: str = "all") -> str:
     """
@@ -146,45 +285,7 @@ def list_bundles(bundle_type: str = "all") -> str:
         A formatted string with bundle information including name, type, and link.
     """
     try:
-        url = "https://www.humblebundle.com/bundles"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
-
-        response = httpx.get(url, headers=headers, timeout=30.0, follow_redirects=True)
-        response.raise_for_status()
-
-        html = response.text
-        soup = BeautifulSoup(html, "html.parser")
-
-        bundles = []
-
-        # Extract bundle data from JSON in the page
-        # Look for tile data with product URLs in the HTML
-        tile_pattern = r'"tile_name":\s*"([^"]+)".*?"product_url":\s*"([^"]+)"'
-        matches = re.findall(tile_pattern, html, re.DOTALL)
-
-        seen_names = set()
-        for match in matches:
-            tile_name, product_url = match
-            # Clean up the data
-            tile_name = tile_name.strip()
-            if tile_name and tile_name not in seen_names:
-                seen_names.add(tile_name)
-
-                # Build full URL
-                bundle_url = f"https://www.humblebundle.com{product_url}"
-
-                # Determine category from URL
-                category = _get_category(product_url)
-
-                # Filter by bundle type if specified
-                if bundle_type != "all" and category != bundle_type:
-                    continue
-
-                bundles.append(
-                    {"name": tile_name, "category": category, "url": bundle_url}
-                )
+        bundles = _get_bundles_data(bundle_type)
 
         if not bundles:
             return "No bundles found at this time. Please try again later or visit https://www.humblebundle.com/bundles directly."
@@ -209,20 +310,18 @@ def get_bundle_details(bundle_name: str) -> str:
         bundle_name: The name or partial name of the bundle to get details for.
 
     Returns:
-        Detailed information about the bundle.
+        Detailed information about the bundle including price tiers.
     """
     try:
-        # First, get the list of bundles to find a match
-        bundles_list = list_bundles()
-
-        # Extract URLs from the bundles list
-        url_pattern = r"Link:\s*(https://www\.humblebundle\.com/[^\s]+)"
-        urls = re.findall(url_pattern, bundles_list)
+        # Get the list of bundles to find a match
+        bundles = _get_bundles_data()
 
         # Find matching bundle
-        matching_url = _find_matching_url(bundle_name, urls)
+        matching_bundle = _find_matching_bundle(bundle_name, bundles)
 
-        if not matching_url:
+        if not matching_bundle:
+            # Format available bundles for error message
+            bundles_list = _format_bundle_list(bundles)
             return (
                 f"Bundle '{bundle_name}' not found. Available bundles:\n{bundles_list}"
             )
@@ -233,7 +332,7 @@ def get_bundle_details(bundle_name: str) -> str:
         }
 
         response = httpx.get(
-            matching_url, headers=headers, timeout=30.0, follow_redirects=True
+            matching_bundle["url"], headers=headers, timeout=30.0, follow_redirects=True
         )
         response.raise_for_status()
 
@@ -242,12 +341,29 @@ def get_bundle_details(bundle_name: str) -> str:
         # Extract metadata
         metadata = _extract_bundle_metadata(html, bundle_name)
 
+        # Extract price tiers
+        price_tiers = _extract_price_tiers(html)
+
         # Format result
         result = f"Bundle Details:\n\n"
         result += f"Name: {metadata['title']}\n"
-        result += f"Link: {matching_url}\n"
+        result += f"Type: {matching_bundle['category']}\n"
+        result += f"Link: {matching_bundle['url']}\n"
         result += f"Description: {metadata['description']}\n"
-        result += f"\n\nVisit the link for full details, pricing, and to purchase."
+
+        # Add price tier information if available
+        if price_tiers:
+            result += f"\n\nPrice Tiers:\n"
+            for i, tier in enumerate(price_tiers, 1):
+                if tier.get("price"):
+                    result += f"  Tier {i}: {tier['price']}"
+                    if tier.get("item_count"):
+                        result += f" ({tier['item_count']} items)"
+                    result += "\n"
+        else:
+            result += f"\n\nPrice tiers: Visit the link for pricing details"
+
+        result += f"\n\nVisit the link for full details, complete item lists, and to purchase."
 
         return result
 

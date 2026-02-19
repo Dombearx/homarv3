@@ -15,12 +15,14 @@ from loguru import logger
 from dotenv import load_dotenv
 import logfire
 import uvicorn
+from pydantic_ai import DeferredToolRequests, UnexpectedModelBehavior
 from src.models.schemas import MyDeps
 from src.agents_as_tools.image_generation_agent import (
     image_generation_agent,
     generate_image,
 )
 from src.homar import run_homar_with_history
+from src.discord_approval import request_approval
 import platform
 
 logfire.configure(send_to_logfire=True)
@@ -234,9 +236,40 @@ async def on_message(message: discord.Message):
             )
 
             # Note: We ignore the updated history (_) as we fetch it fresh from Discord on each message
-            response_message, _, generated_images = await run_homar_with_history(
+            (
+                response_output,
+                new_messages,
+                generated_images,
+            ) = await run_homar_with_history(
                 new_message=actual_message, history=thread_history, deps=deps
             )
+
+            # Check if we got a deferred tool request (approval needed)
+            if isinstance(response_output, DeferredToolRequests):
+                logger.info(
+                    f"Agent requires approval for {len(response_output.approvals)} tool(s)"
+                )
+
+                # Request user approval via Discord UI
+                approval_results = await request_approval(thread, response_output)
+
+                # Continue the agent run with approval results
+                # Use the message history from the first run
+                from src.homar import homar
+
+                agent_response = await homar.run(
+                    message_history=new_messages,
+                    deferred_tool_results=approval_results,
+                    deps=deps,
+                )
+                response_message = agent_response.output
+
+                # Update generated images if any were created
+                if deps.generated_images:
+                    generated_images = deps.generated_images
+            else:
+                # Normal string response
+                response_message = response_output
 
             # Send text response
             await thread.send(response_message)
@@ -252,6 +285,17 @@ async def on_message(message: discord.Message):
                             logger.warning(f"Image file not found: {image_path}")
                     except Exception as img_error:
                         logger.error(f"Failed to send image {image_path}: {img_error}")
+    except UnexpectedModelBehavior as e:
+        # Handle case where tool retries are exhausted
+        logger.error(f"Tool retry limit exceeded: {e}")
+        try:
+            error_message = "Nie udało mi się wykonać tej operacji pomimo kilku prób. Proszę spróbować ponownie z innym sformułowaniem lub podać więcej szczegółów."
+            if e.__cause__:
+                # Include the underlying error context if available
+                logger.error(f"Underlying cause: {e.__cause__}")
+            await thread.send(error_message)
+        except Exception as send_error:
+            logger.error(f"Failed to send retry error message: {send_error}")
     except Exception as e:
         logger.error(f"Error processing message: {e}")
         try:

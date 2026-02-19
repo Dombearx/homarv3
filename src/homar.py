@@ -1,5 +1,5 @@
 import os
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, RunContext, DeferredToolRequests, ModelRetry
 from pydantic_ai.mcp import MCPServerStreamableHTTP, MCPServerSSE
 import httpx
 import asyncio
@@ -47,12 +47,13 @@ settings = OpenAIResponsesModelSettings(
 homar = Agent(
     "openai:gpt-4o",
     deps_type=MyDeps,
+    output_type=str | DeferredToolRequests,
     instructions="Nazywasz się Homar. Jesteś domowym asystentem. Wykonuj polecenia użytkownika korzystając z swojej wiedzy i dostępnych narzędzi. Odpowiadaj krótko i zwięźle, nie oferuj dodatkowej pomocy i proponuj kolejnych działań. Jesteś dokładny i masz poczucie humoru. Jesteś domyślny, potrafisz zrozumieć polecenie nawet jeżeli nie było do końca sprecyzowane. Korzystaj z swojej wiedzy. Najczęściej będziesz musiał wykorzystać narzędzia do wykonania polecenia. Możesz również analizować obrazy, które użytkownik wysyła.",
     model_settings=settings,
 )
 
 
-@homar.tool
+@homar.tool(retries=3)
 async def todoist_api(ctx: RunContext[MyDeps], command: str) -> str:
     """Use this tool to interact with the Todoist API - todos, shopping list, tasks, things to remember, etc.
 
@@ -63,15 +64,21 @@ async def todoist_api(ctx: RunContext[MyDeps], command: str) -> str:
     Returns:
         The response from the Todoist API as a string.
     """
-    r = await todoist_agent.run(
-        command,
-        deps=ctx.deps,
-        usage=ctx.usage,
-    )
-    return r.output
+    try:
+        r = await todoist_agent.run(
+            command,
+            deps=ctx.deps,
+            usage=ctx.usage,
+        )
+        return r.output
+    except Exception as e:
+        logger.warning(f"Todoist API tool error: {e}")
+        raise ModelRetry(
+            f"The Todoist API call failed with error: {str(e)}. Please try again with a different approach or rephrase the command."
+        )
 
 
-@homar.tool
+@homar.tool(retries=3)
 async def home_assistant_api(ctx: RunContext[MyDeps], command: str) -> str:
     """Use this tool to interact with the Home Assistant API - check status and control devices such as: lights, pc.
 
@@ -82,15 +89,21 @@ async def home_assistant_api(ctx: RunContext[MyDeps], command: str) -> str:
     Returns:
         The response from the Home Assistant API as a string.
     """
-    r = await home_assistant_agent.run(
-        command,
-        deps=ctx.deps,
-        usage=ctx.usage,
-    )
-    return r.output
+    try:
+        r = await home_assistant_agent.run(
+            command,
+            deps=ctx.deps,
+            usage=ctx.usage,
+        )
+        return r.output
+    except Exception as e:
+        logger.warning(f"Home Assistant API tool error: {e}")
+        raise ModelRetry(
+            f"The Home Assistant API call failed with error: {str(e)}. Please try again with a different approach or be more specific about the device or action."
+        )
 
 
-@homar.tool
+@homar.tool(retries=3)
 async def image_generation_api(ctx: RunContext[MyDeps], description: str) -> str:
     """Use this tool to generate images.
 
@@ -101,28 +114,34 @@ async def image_generation_api(ctx: RunContext[MyDeps], description: str) -> str
     Returns:
         The filepath of the generated image.
     """
-    from src.agents_as_tools.image_generation_agent import generate_image
+    try:
+        from src.agents_as_tools.image_generation_agent import generate_image
 
-    r = await image_generation_agent.run(
-        description,
-        deps=ctx.deps,
-        usage=ctx.usage,
-    )
+        r = await image_generation_agent.run(
+            description,
+            deps=ctx.deps,
+            usage=ctx.usage,
+        )
 
-    # Generate the actual image file
-    image_filename = generate_image(r.output, "homar_generated")
+        # Generate the actual image file
+        image_filename = generate_image(r.output, "homar_generated")
 
-    # Store the image filename in deps so it can be sent back
-    if ctx.deps:
-        from src.agents_as_tools.consts import IMAGE_GENERATION_OUTPUT_DIR
+        # Store the image filename in deps so it can be sent back
+        if ctx.deps:
+            from src.agents_as_tools.consts import IMAGE_GENERATION_OUTPUT_DIR
 
-        image_path = IMAGE_GENERATION_OUTPUT_DIR / image_filename
-        ctx.deps.generated_images.append(str(image_path))
+            image_path = IMAGE_GENERATION_OUTPUT_DIR / image_filename
+            ctx.deps.generated_images.append(str(image_path))
 
-    return f"Image generated successfully: {image_filename}"
+        return f"Image generated successfully: {image_filename}"
+    except Exception as e:
+        logger.warning(f"Image generation API tool error: {e}")
+        raise ModelRetry(
+            f"Image generation failed with error: {str(e)}. Please try again with a clearer or more specific description."
+        )
 
 
-@homar.tool
+@homar.tool(retries=3)
 async def grocy_api(ctx: RunContext[MyDeps], command: str) -> str:
     """Use this tool to interact with the Grocy API - home groceries management. Allows to add products, check stock, consume stock, open stock, etc.
     Use whenever user informs about groceries - added to fridge, opened, consumed, etc.
@@ -134,17 +153,23 @@ async def grocy_api(ctx: RunContext[MyDeps], command: str) -> str:
     Returns:
         The response from the Grocy API as a string.
     """
-    from src.agents_as_tools.grocy_agent import grocy_agent
+    try:
+        from src.agents_as_tools.grocy_agent import grocy_agent
 
-    r = await grocy_agent.run(
-        command,
-        deps=ctx.deps,
-        usage=ctx.usage,
-    )
-    return r.output
+        r = await grocy_agent.run(
+            command,
+            deps=ctx.deps,
+            usage=ctx.usage,
+        )
+        return r.output
+    except Exception as e:
+        logger.warning(f"Grocy API tool error: {e}")
+        raise ModelRetry(
+            f"The Grocy API call failed with error: {str(e)}. Please try again with a different approach or be more specific about the product or action."
+        )
 
 
-@homar.tool
+@homar.tool(retries=3)
 async def google_calendar_api(ctx: RunContext[MyDeps], command: str) -> str:
     """Use this tool to interact with Google Calendar - manage events, appointments, meetings, reminders with dates.
     Use whenever user asks about calendar, schedule, events, appointments, or wants to create/check/modify calendar entries.
@@ -155,15 +180,21 @@ async def google_calendar_api(ctx: RunContext[MyDeps], command: str) -> str:
     Returns:
         The response from the Google Calendar API as a string.
     """
-    r = await google_calendar_agent.run(
-        command,
-        deps=ctx.deps,
-        usage=ctx.usage,
-    )
-    return r.output
+    try:
+        r = await google_calendar_agent.run(
+            command,
+            deps=ctx.deps,
+            usage=ctx.usage,
+        )
+        return r.output
+    except Exception as e:
+        logger.warning(f"Google Calendar API tool error: {e}")
+        raise ModelRetry(
+            f"The Google Calendar API call failed with error: {str(e)}. Please try again with a different approach or provide more specific date/time information."
+        )
 
 
-@homar.tool
+@homar.tool(retries=3)
 async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
     """Use this tool to check HumbleBundle deals and bundles.
     Use when user asks about HumbleBundle, game bundles, book bundles, software bundles, or current deals on HumbleBundle.
@@ -175,12 +206,34 @@ async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
     Returns:
         Information about HumbleBundle bundles as a string.
     """
-    r = await humblebundle_agent.run(
-        command,
-        deps=ctx.deps,
-        usage=ctx.usage,
-    )
-    return r.output
+    try:
+        r = await humblebundle_agent.run(
+            command,
+            deps=ctx.deps,
+            usage=ctx.usage,
+        )
+        return r.output
+    except Exception as e:
+        logger.warning(f"HumbleBundle API tool error: {e}")
+        raise ModelRetry(
+            f"The HumbleBundle API call failed with error: {str(e)}. Please try again with a different approach or rephrase your request."
+        )
+
+
+@homar.tool_plain(requires_approval=True)
+def approval_test_tool(test_parameter: str) -> str:
+    """Test tool for Discord approval mechanism - this tool always requires user confirmation.
+
+    This is a simple test tool to demonstrate the approval workflow. When called,
+    it will require the user to approve or reject the action via Discord UI.
+
+    Args:
+        test_parameter: A test parameter to demonstrate how parameters are displayed for approval
+
+    Returns:
+        A success message if approved
+    """
+    return f"Test tool executed successfully with parameter: {test_parameter}"
 
 
 @homar.tool_plain
@@ -189,7 +242,7 @@ def calculate_sum(a: int, b: int) -> int:
     return a + b
 
 
-@homar.tool
+@homar.tool(retries=2)
 async def send_delayed_message(
     ctx: RunContext[MyDeps],
     message: str,
@@ -263,7 +316,7 @@ async def send_delayed_message(
         return f"Error scheduling message: {str(e)}"
 
 
-@homar.tool
+@homar.tool(retries=2)
 async def send_scheduled_message(
     ctx: RunContext[MyDeps], message: str, scheduled_datetime: str
 ) -> str:
@@ -356,7 +409,7 @@ async def send_scheduled_message(
         return f"Error scheduling message: {str(e)}"
 
 
-@homar.tool
+@homar.tool(retries=2)
 async def list_scheduled_messages(ctx: RunContext[MyDeps]) -> str:
     """List all scheduled messages that are pending delivery.
 
@@ -395,7 +448,7 @@ async def list_scheduled_messages(ctx: RunContext[MyDeps]) -> str:
     return "\n".join(result)
 
 
-@homar.tool
+@homar.tool(retries=2)
 async def cancel_scheduled_message(ctx: RunContext[MyDeps], message_id: str) -> str:
     """Cancel a scheduled message that hasn't been sent yet.
 
@@ -437,7 +490,7 @@ async def run_homar(message: str, channel: str = None, deps: MyDeps = None) -> s
 
 async def run_homar_with_history(
     new_message: str, history: list[ModelMessage], deps: MyDeps = None
-) -> tuple[str, list[ModelMessage], list[str]]:
+) -> tuple[str | DeferredToolRequests, list[ModelMessage], list[str]]:
     if deps is None:
         deps = MyDeps()
     agent_response = await homar.run(new_message, message_history=history, deps=deps)

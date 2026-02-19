@@ -31,6 +31,7 @@ from src.agents_as_tools.image_generation_agent import (
 )
 from src.homar import run_homar_with_history
 from src.discord_approval import request_approval
+from src.models.schemas import get_user_type_from_discord_roles
 import platform
 
 logfire.configure(send_to_logfire=True)
@@ -229,8 +230,13 @@ async def on_message(message: discord.Message):
             thread_history = await _get_thread_history(thread)
 
             # Create deps with thread context for delayed message support
+            username = message.author.display_name
+            discord_role_names = [r.name for r in getattr(message.author, "roles", [])]
             deps = MyDeps(
-                thread_id=thread.id, send_message_callback=_send_message_to_thread
+                thread_id=thread.id,
+                send_message_callback=_send_message_to_thread,
+                username=username,
+                user_type=get_user_type_from_discord_roles(discord_role_names),
             )
 
             # Note: We ignore the updated history (_) as we fetch it fresh from Discord on each message

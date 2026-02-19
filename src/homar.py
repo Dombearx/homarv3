@@ -19,7 +19,7 @@ from src.agents_as_tools.image_generation_agent import image_generation_agent
 from src.agents_as_tools.google_calendar_agent import google_calendar_agent
 from src.agents_as_tools.humblebundle_agent import humblebundle_agent
 from src.delayed_message_scheduler import get_scheduler
-from src.models.schemas import MyDeps
+from src.models.schemas import MyDeps, UserType, GUEST_ALLOWED_TOOLS
 
 # Constants
 MAX_DELAY_SECONDS = 86400 * 7  # 7 days
@@ -37,6 +37,18 @@ def _format_delay_seconds(seconds: int) -> str:
     if minutes:
         return f"{hours} hours and {minutes} minutes"
     return f"{hours} hours"
+
+
+def _check_tool_access(ctx: RunContext[MyDeps], tool_name: str) -> str | None:
+    """Return an error string if the user lacks access to *tool_name*, else None."""
+    if (
+        ctx.deps is not None
+        and ctx.deps.user_type == UserType.GUEST
+        and tool_name not in GUEST_ALLOWED_TOOLS
+    ):
+        username = ctx.deps.username or "unknown"
+        return f"Access denied: user '{username}' (guest) is not allowed to use the '{tool_name}' tool."
+    return None
 
 
 settings = OpenAIResponsesModelSettings(
@@ -65,6 +77,8 @@ async def todoist_api(ctx: RunContext[MyDeps], command: str) -> str:
         The response from the Todoist API as a string.
     """
     try:
+        if error := _check_tool_access(ctx, "todoist_api"):
+            return error
         r = await todoist_agent.run(
             command,
             deps=ctx.deps,
@@ -115,6 +129,8 @@ async def image_generation_api(ctx: RunContext[MyDeps], description: str) -> str
         The filepath of the generated image.
     """
     try:
+        if error := _check_tool_access(ctx, "image_generation_api"):
+            return error
         from src.agents_as_tools.image_generation_agent import generate_image
 
         r = await image_generation_agent.run(
@@ -154,6 +170,8 @@ async def grocy_api(ctx: RunContext[MyDeps], command: str) -> str:
         The response from the Grocy API as a string.
     """
     try:
+        if error := _check_tool_access(ctx, "grocy_api"):
+            return error
         from src.agents_as_tools.grocy_agent import grocy_agent
 
         r = await grocy_agent.run(
@@ -181,6 +199,8 @@ async def google_calendar_api(ctx: RunContext[MyDeps], command: str) -> str:
         The response from the Google Calendar API as a string.
     """
     try:
+        if error := _check_tool_access(ctx, "google_calendar_api"):
+            return error
         r = await google_calendar_agent.run(
             command,
             deps=ctx.deps,
@@ -207,6 +227,8 @@ async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
         Information about HumbleBundle bundles as a string.
     """
     try:
+        if error := _check_tool_access(ctx, "humblebundle_api"):
+            return error
         r = await humblebundle_agent.run(
             command,
             deps=ctx.deps,

@@ -2,6 +2,12 @@ import asyncio
 import os
 import re
 import threading
+import warnings
+
+# Suppress audioop deprecation warning from discord.py as we don't use voice features
+# discord.py 2.6.4+ handles Python 3.13+ via audioop-lts dependency
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="discord.player")
+
 import discord
 from discord.ext import commands
 import httpx
@@ -9,12 +15,23 @@ from loguru import logger
 from dotenv import load_dotenv
 import logfire
 import uvicorn
+from pydantic_ai import (
+    DeferredToolRequests,
+    UnexpectedModelBehavior,
+    ImageUrl,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    UserPromptPart,
+)
 from src.models.schemas import MyDeps
 from src.agents_as_tools.image_generation_agent import (
     image_generation_agent,
     generate_image,
 )
 from src.homar import run_homar_with_history
+from src.discord_approval import request_approval
+from src.models.schemas import get_user_type_from_discord_roles
 import platform
 
 logfire.configure(send_to_logfire=True)
@@ -75,8 +92,8 @@ async def _send_message_to_thread(message: str, thread_id: int):
         logger.error(f"Error sending message to thread {thread_id}: {e}")
 
 
-def _get_actual_message(message: discord.Message, is_delayed_command: bool) -> str:
-    """Extract the actual message content, removing delayed command marker if present."""
+def _extract_text_content(message: discord.Message, is_delayed_command: bool) -> str:
+    """Extract text content from message, handling delayed commands."""
     if is_delayed_command:
         actual_message = message.content[len(DELAYED_COMMAND_MARKER) :].strip()
         logger.info(f"Processing delayed command: {actual_message}")
@@ -84,23 +101,73 @@ def _get_actual_message(message: discord.Message, is_delayed_command: bool) -> s
     return message.content
 
 
+def _extract_image_attachments(message: discord.Message) -> list[ImageUrl]:
+    """Extract image attachments from a Discord message."""
+    images = []
+    for attachment in message.attachments:
+        if attachment.content_type and attachment.content_type.startswith("image/"):
+            images.append(ImageUrl(url=attachment.url))
+    return images
+
+
+def _get_actual_message(message: discord.Message, is_delayed_command: bool) -> list:
+    """Extract the actual message content, removing delayed command marker if present.
+    Returns a list containing text and ImageUrl objects."""
+    content = []
+
+    text_content = _extract_text_content(message, is_delayed_command)
+    if text_content:
+        content.append(text_content)
+
+    images = _extract_image_attachments(message)
+    content.extend(images)
+
+    return content
+
+
+def _build_user_message_content(msg: discord.Message) -> list:
+    """Build content list with text and images for a user message."""
+    content = []
+    if msg.content:
+        content.append(msg.content)
+
+    images = _extract_image_attachments(msg)
+    content.extend(images)
+
+    return content
+
+
+def _create_user_message_request(content: list) -> ModelRequest:
+    """Create a ModelRequest for user message with the given content."""
+    return ModelRequest(parts=[UserPromptPart(content=content)])
+
+
 async def _get_thread_history(thread: discord.Thread) -> list:
     """Fetch message history from Discord thread and convert to ModelMessage format."""
-    from pydantic_ai import ModelMessage, TextPart
-
-    # Fetch last 50 messages from thread
+    # Fetch last 100 messages from thread
     messages = []
-    async for msg in thread.history(limit=50):
+    async for msg in thread.history(limit=100):
         # Skip system messages, include both user and bot messages
         if msg.type != discord.MessageType.default:
             continue
 
-        # Determine role: bot messages are "assistant", user messages are "user"
-        role = "assistant" if msg.author.bot else "user"
-        messages.append(ModelMessage(role=role, content=[TextPart(text=msg.content)]))
+        # Create appropriate message type based on author
+        if msg.author.bot:
+            # Bot messages are ModelResponse with TextPart
+            messages.append(ModelResponse(parts=[TextPart(content=msg.content)]))
+        else:
+            # User messages are ModelRequest with UserPromptPart
+            content = _build_user_message_content(msg)
+            if content:
+                messages.append(_create_user_message_request(content))
 
-    # Reverse to get chronological order
-    return list(reversed(messages))
+    # Reverse to get chronological order (oldest first)
+    result = list(reversed(messages))
+    logger.info(
+        f"Fetched {len(result)} messages from thread {thread.id} ({thread.name})"
+    )
+
+    return result
 
 
 @bot.event
@@ -163,14 +230,50 @@ async def on_message(message: discord.Message):
             thread_history = await _get_thread_history(thread)
 
             # Create deps with thread context for delayed message support
+            username = message.author.display_name
+            discord_role_names = [r.name for r in getattr(message.author, "roles", [])]
             deps = MyDeps(
-                thread_id=thread.id, send_message_callback=_send_message_to_thread
+                thread_id=thread.id,
+                send_message_callback=_send_message_to_thread,
+                username=username,
+                user_type=get_user_type_from_discord_roles(discord_role_names),
             )
 
             # Note: We ignore the updated history (_) as we fetch it fresh from Discord on each message
-            response_message, _, generated_images = await run_homar_with_history(
+            (
+                response_output,
+                new_messages,
+                generated_images,
+            ) = await run_homar_with_history(
                 new_message=actual_message, history=thread_history, deps=deps
             )
+
+            # Check if we got a deferred tool request (approval needed)
+            if isinstance(response_output, DeferredToolRequests):
+                logger.info(
+                    f"Agent requires approval for {len(response_output.approvals)} tool(s)"
+                )
+
+                # Request user approval via Discord UI
+                approval_results = await request_approval(thread, response_output)
+
+                # Continue the agent run with approval results
+                # Use the message history from the first run
+                from src.homar import homar
+
+                agent_response = await homar.run(
+                    message_history=new_messages,
+                    deferred_tool_results=approval_results,
+                    deps=deps,
+                )
+                response_message = agent_response.output
+
+                # Update generated images if any were created
+                if deps.generated_images:
+                    generated_images = deps.generated_images
+            else:
+                # Normal string response
+                response_message = response_output
 
             # Send text response
             await thread.send(response_message)
@@ -186,6 +289,17 @@ async def on_message(message: discord.Message):
                             logger.warning(f"Image file not found: {image_path}")
                     except Exception as img_error:
                         logger.error(f"Failed to send image {image_path}: {img_error}")
+    except UnexpectedModelBehavior as e:
+        # Handle case where tool retries are exhausted
+        logger.error(f"Tool retry limit exceeded: {e}")
+        try:
+            error_message = "Nie udało mi się wykonać tej operacji pomimo kilku prób. Proszę spróbować ponownie z innym sformułowaniem lub podać więcej szczegółów."
+            if e.__cause__:
+                # Include the underlying error context if available
+                logger.error(f"Underlying cause: {e.__cause__}")
+            await thread.send(error_message)
+        except Exception as send_error:
+            logger.error(f"Failed to send retry error message: {send_error}")
     except Exception as e:
         logger.error(f"Error processing message: {e}")
         try:

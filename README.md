@@ -8,6 +8,7 @@ A Polish-speaking home assistant Discord bot powered by PydanticAI, with integra
 - **Todoist Integration**: Manage tasks, shopping lists, and reminders
 - **Grocy Integration**: Home groceries management
 - **Google Calendar Integration**: Manage calendar events, appointments, and meetings
+- **HumbleBundle Integration**: Check available game, book, and software bundles from HumbleBundle.com
 - **Image Generation**: Generate RPG scene images
 - **Memory Layer**: Remember and recall user preferences using mem0 (see [docs/MEMORY.md](docs/MEMORY.md))
 - **Delayed Message Tool**: Schedule commands to be executed after a specified delay (see [docs/DELAYED_MESSAGES.md](docs/DELAYED_MESSAGES.md))
@@ -24,6 +25,7 @@ homarv3/
 │   │   ├── home_assistant_agent.py  # Home Assistant control
 │   │   ├── grocy_agent.py       # Grocy groceries management
 │   │   ├── google_calendar_agent.py  # Google Calendar integration
+│   │   ├── humblebundle_agent.py    # HumbleBundle deals checker
 │   │   └── image_generation_agent.py  # RPG image generation
 │   ├── delayed_message_scheduler.py  # Delayed message scheduling
 │   ├── displayer/               # FastAPI image viewer service
@@ -94,12 +96,12 @@ homarv3/
       - Click "Create Credentials" > "OAuth client ID"
       - Choose "Desktop app" as the application type
       - Download the credentials JSON file
-      - Save it and set the path in `GOOGLE_CALENDAR_CREDENTIALS_PATH` environment variable
+      - Save it as `gcp-oauth.keys.json` and set the path in `GOOGLE_CALENDAR_CREDENTIALS_PATH` environment variable
    
    f. On first run, the MCP server will open a browser for OAuth authorization. Follow the prompts to authorize access.
 
 6. **Install Node.js** (required for Google Calendar MCP server):
-   The Google Calendar agent uses the `mcp-google-calendar` npm package which runs via `npx`.
+   The Google Calendar agent uses the `@cocal/google-calendar-mcp` npm package which runs via `npx`.
    ```bash
    # Install Node.js if not already installed
    # On Ubuntu/Debian:
@@ -139,8 +141,9 @@ The bot responds to messages in Discord channels and threads. It supports:
 2. **Home control**: "Włącz światło w sypialni" (Turn on bedroom light)
 3. **Task management**: "Dodaj mleko do listy zakupów" (Add milk to shopping list)
 4. **Calendar management**: "Co mam w kalendarzu jutro?" (What's on my calendar tomorrow?)
-5. **Delayed actions**: "Wyłącz światło za godzinę" (Turn off light in 1 hour)
-6. **RPG image generation**: In #rpg or #rpg2 channels
+5. **HumbleBundle deals**: "Pokaż aktualne bundle na HumbleBundle" (Show current HumbleBundle deals)
+6. **Delayed actions**: "Wyłącz światło za godzinę" (Turn off light in 1 hour)
+7. **RPG image generation**: In #rpg or #rpg2 channels
 
 For more details on the delayed message feature, see [docs/DELAYED_MESSAGES.md](docs/DELAYED_MESSAGES.md).
 

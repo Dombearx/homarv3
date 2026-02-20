@@ -4,12 +4,11 @@ from pydantic_ai.mcp import MCPServerStdio
 from src.grocy_mcp.grocy_mcp import list_locations, list_quantity_units, list_products
 from pydantic_ai.toolsets.fastmcp import FastMCPToolset
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from src.grocy_mcp.grocy_mcp import mcp
 
-# grocy_mcp_server = MCPServerStdio(
-#     "python",
-#     args=["-m", "src.grocy_mcp.grocy_mcp"],
-# )
+# Default timezone for date/time operations
+DEFAULT_TIMEZONE = "Europe/Warsaw"
 
 grocy_mcp_toolset = FastMCPToolset(mcp)
 
@@ -43,7 +42,8 @@ async def add_devices_info(ctx: RunContext) -> str:
     quantity_units = list_quantity_units()
     products = list_products()
 
-    current_date = datetime.now().strftime("%Y-%m-%d")
+    tz = ZoneInfo(DEFAULT_TIMEZONE)
+    current_date = datetime.now(tz=tz).strftime("%Y-%m-%d")
 
     return (
         f"Current Date: {current_date}\n\n{locations}\n\n{quantity_units}\n\n{products}"
@@ -53,6 +53,7 @@ async def add_devices_info(ctx: RunContext) -> str:
 if __name__ == "__main__":
     import asyncio
 
+    # test
     async def main():
         r = await grocy_agent.run(
             "Open a milk",

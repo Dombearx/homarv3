@@ -1,12 +1,13 @@
 # Delayed and Scheduled Message Tools
 
-## Overview
+## Tools Available
 
-The delayed and scheduled message tools allow the Homar agent to schedule messages to be sent to itself at a future time. This is useful for executing commands that need to happen in the future, such as turning off lights after a certain period or setting reminders at specific times.
+The delayed and scheduled message system provides the following tools for the Homar agent:
 
-There are two tools available:
-1. **send_delayed_message**: Schedule a message with a delay in seconds
+1. **send_delayed_message**: Schedule a message with a delay in seconds/minutes/hours
 2. **send_scheduled_message**: Schedule a message at a specific date and time
+3. **list_scheduled_messages**: List all pending scheduled messages
+4. **cancel_scheduled_message**: Cancel a previously scheduled message
 
 ## How It Works
 
@@ -113,12 +114,48 @@ Scheduled to send 'Turn off the lights' on 2026-02-14 at 22:00:00
 
 **Agent Response:**
 ```
-Scheduled to send 'Check the oven' on 2024-12-25 at 09:00:00
+Scheduled to send 'Check the oven' on 2024-12-25 at 09:00:00 CET
 ```
 
 **On December 25th at 9am:**
 - The message `[DELAYED_COMMAND] Check the oven` is sent to the thread
 - The agent receives it and sends a reminder message
+
+### User: "What actions do I have scheduled?"
+
+**Agent Response:**
+```
+Found 2 scheduled message(s):
+
+- ID: delayed_1
+  Time: 2026-02-16 22:30:00 CET
+  Message: Turn off bedroom light
+
+- ID: scheduled_1
+  Time: 2026-12-25 09:00:00 CET
+  Message: Check the oven
+```
+
+### User: "Cancel the scheduled message delayed_1"
+
+**Agent Response:**
+```
+Successfully cancelled scheduled message: delayed_1
+```
+
+The scheduled action for turning off the bedroom light has been removed and will not execute.
+
+### User: "Cancel that reminder"
+
+**Agent Action:**
+1. The agent calls `list_scheduled_messages` to see what's scheduled
+2. Identifies which message the user is referring to
+3. Calls `cancel_scheduled_message` with the appropriate message ID
+
+**Agent Response:**
+```
+Successfully cancelled scheduled message: scheduled_1
+```
 
 ## Technical Details
 
@@ -164,6 +201,7 @@ async def send_scheduled_message(
 - `ctx`: PydanticAI run context with MyDeps (thread_id and send_message_callback)
 - `message`: The command/message to send at the scheduled time
 - `scheduled_datetime`: ISO 8601 datetime string (e.g., "2024-12-25T09:00:00")
+                       Times are interpreted in Europe/Warsaw timezone (CET/CEST)
 
 **Supported datetime formats:**
 - `YYYY-MM-DDTHH:MM:SS` (ISO 8601 with T separator)
@@ -174,6 +212,64 @@ async def send_scheduled_message(
 
 **Returns:**
 - String confirmation of the scheduled message
+
+#### list_scheduled_messages
+
+```python
+@homar.tool
+async def list_scheduled_messages(ctx: RunContext[MyDeps]) -> str
+```
+
+**Purpose:**
+Lists all currently scheduled messages that are pending delivery.
+
+**Parameters:**
+- `ctx`: PydanticAI run context with MyDeps
+
+**Returns:**
+- A formatted list of all scheduled messages with their IDs, scheduled times, and content
+- "No scheduled messages pending." if there are no scheduled messages
+
+**Usage:**
+Use when the user asks to see pending actions, scheduled messages, or what's coming up.
+
+**Example output:**
+```
+Found 2 scheduled message(s):
+
+- ID: delayed_1
+  Time: 2026-02-16 22:30:00 CET
+  Message: Turn off living room light
+
+- ID: scheduled_1
+  Time: 2026-02-17 09:00:00 CET
+  Message: Remind me to check the mail
+```
+
+#### cancel_scheduled_message
+
+```python
+@homar.tool
+async def cancel_scheduled_message(ctx: RunContext[MyDeps], message_id: str) -> str
+```
+
+**Purpose:**
+Cancels a previously scheduled message that hasn't been sent yet.
+
+**Parameters:**
+- `ctx`: PydanticAI run context with MyDeps
+- `message_id`: The ID of the scheduled message to cancel (e.g., "delayed_1" or "scheduled_1")
+
+**Returns:**
+- Confirmation that the message was cancelled or an error if not found
+
+**Usage:**
+Use when the user wants to cancel a scheduled action. The user can specify the message by its ID (obtained from `list_scheduled_messages`) or by description.
+
+**Examples:**
+- "Cancel scheduled message delayed_1"
+- "Cancel that reminder"
+- "Remove the scheduled action"
 
 ### Delayed Message Format
 
@@ -211,19 +307,30 @@ Agent executes the action
 2. **Maximum Delay**: Limited to 7 days (604800 seconds) for both delayed and scheduled messages
 3. **Minimum Delay**: Must be at least 1 second in the future
 4. **Thread Scope**: Messages can only be sent to the thread where they were scheduled
-5. **No Timezone Support**: All times are interpreted as local server time
+5. **Timezone**: All times are interpreted as Europe/Warsaw timezone (CET/CEST). The system automatically handles daylight saving time transitions.
+
+## Timezone Support
+
+As of the latest update, the system now supports timezone-aware datetime handling:
+
+- **Default Timezone**: Europe/Warsaw (CET/CEST)
+- **Automatic DST Handling**: The system uses Python's `zoneinfo` module to handle daylight saving time transitions automatically
+- **Time Interpretation**: When you schedule an action at "21:22", it will execute at 21:22 in the Europe/Warsaw timezone, regardless of the server's timezone
+- **Display Format**: Scheduled times are displayed with timezone information (e.g., "2026-02-16 at 21:22:00 CET")
+
+### Why Europe/Warsaw?
+
+The timezone was chosen based on the Polish language used in Homar's instructions, indicating the primary user base is in Poland.
 
 ## Future Enhancements
 
 Potential improvements for the delayed message system:
 
 1. **Persistence**: Store scheduled messages in a database to survive bot restarts
-2. **Cancellation Interface**: Allow users to cancel scheduled messages
-3. **Listing**: Show users their currently scheduled messages
-4. **Recurring Messages**: Support for repeated delayed messages
-5. **Edit Scheduled Messages**: Modify delay or content before execution
-6. **Time Zone Support**: Allow users to specify times in their local timezone
-7. **Natural Language Parsing**: Better parsing of time expressions like "next Tuesday at 3pm"
+2. **Recurring Messages**: Support for repeated delayed messages
+3. **Edit Scheduled Messages**: Modify delay or content before execution
+4. **Configurable Timezone**: Allow users to configure their preferred timezone
+5. **Natural Language Parsing**: Better parsing of time expressions like "next Tuesday at 3pm"
 
 ## Error Handling
 
@@ -242,6 +349,15 @@ The tools handle several error cases:
 - **Maximum Delay**: Returns error if scheduled time is more than 7 days in the future
 - **Scheduling Failures**: Catches and logs exceptions during message scheduling
 - **Send Failures**: Logs errors if message delivery fails
+
+### list_scheduled_messages
+- **No Scheduled Messages**: Returns friendly message when no messages are scheduled
+- **Timezone Display**: Shows scheduled times with timezone information for clarity
+
+### cancel_scheduled_message
+- **Message Not Found**: Returns error message if the specified message_id doesn't exist
+- **Cancellation Success**: Immediately removes the message from the scheduler
+- **Already Sent**: If the message has already been sent, returns not found error
 
 ## Testing
 
@@ -281,6 +397,25 @@ To test the delayed and scheduled message functionality:
 - Try very large delays (should fail if > 7 days)
 - Try scheduling in the past (should fail)
 - Restart the bot while messages are scheduled (messages will be lost)
+
+### New Tools Testing
+
+1. **List Scheduled Messages**: Schedule a few messages then ask
+   ```
+   "What messages are scheduled?"
+   ```
+
+2. **Cancel Message**: Schedule a message, list it to get the ID, then cancel it
+   ```
+   "Schedule a message in 5 minutes to turn off the light"
+   "What messages are scheduled?"  # Get the message ID
+   "Cancel scheduled message delayed_1"
+   ```
+
+3. **Timezone Verification**: Schedule a message for a specific time and verify it executes at the correct time in Europe/Warsaw timezone
+   ```
+   "Turn on the light at 21:22"  # Should execute at 21:22 CET/CEST, not UTC
+   ```
 
 ## Implementation Notes
 

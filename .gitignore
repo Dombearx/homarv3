@@ -43,10 +43,12 @@ data/chats/*
 htmlcov/
 *.cover
 
+# gcp
+gcp-oauth.keys.json
+mcp-google-calendar-token.json
+
 # data
 data/
 
 # other code
-discord_bot
-main__old.py
 src/displayer/media/*

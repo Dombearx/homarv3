@@ -77,10 +77,6 @@ class TestApprovalToolBehavior:
 class TestUpdateMarvinTool:
     """Tests for the update_marvin tool."""
 
-    def test_update_marvin_exists(self):
-        """Verify the update_marvin function exists and is callable."""
-        assert callable(update_marvin)
-
     def test_update_marvin_success(self):
         """Test update_marvin when both commands succeed."""
         mock_git = MagicMock()

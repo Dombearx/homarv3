@@ -243,6 +243,27 @@ async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
         )
 
 
+def _run_command_in_dir(label: str, command: list[str], cwd: str) -> tuple[str | None, str | None]:
+    """Run a command in a directory and return (stdout, error_message).
+
+    Returns:
+        (stdout, None) on success, or (None, error_message) on failure.
+    """
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            return None, f"{label} failed:\n{result.stderr}"
+        return result.stdout, None
+    except Exception as e:
+        return None, f"{label} error: {str(e)}"
+
+
 @homar.tool_plain(requires_approval=True)
 def update_marvin() -> str:
     """Update Marvin bot by running git pull and make restart in the /Marvin directory.
@@ -257,33 +278,15 @@ def update_marvin() -> str:
     marvin_dir = "/Marvin"
     results = []
 
-    try:
-        git_result = subprocess.run(
-            ["git", "pull"],
-            cwd=marvin_dir,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        results.append(f"git pull:\n{git_result.stdout}")
-        if git_result.returncode != 0:
-            return f"git pull failed:\n{git_result.stderr}"
-    except Exception as e:
-        return f"git pull error: {str(e)}"
+    stdout, error = _run_command_in_dir("git pull", ["git", "pull"], marvin_dir)
+    if error:
+        return error
+    results.append(f"git pull:\n{stdout}")
 
-    try:
-        make_result = subprocess.run(
-            ["make", "restart"],
-            cwd=marvin_dir,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        results.append(f"make restart:\n{make_result.stdout}")
-        if make_result.returncode != 0:
-            return f"make restart failed:\n{make_result.stderr}"
-    except Exception as e:
-        return f"make restart error: {str(e)}"
+    stdout, error = _run_command_in_dir("make restart", ["make", "restart"], marvin_dir)
+    if error:
+        return error
+    results.append(f"make restart:\n{stdout}")
 
     return "\n".join(results)
 

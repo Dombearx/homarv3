@@ -1,4 +1,5 @@
 import os
+import subprocess
 from pydantic_ai import Agent, RunContext, DeferredToolRequests, ModelRetry
 from pydantic_ai.mcp import MCPServerStreamableHTTP, MCPServerSSE
 import httpx
@@ -240,6 +241,51 @@ async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
         raise ModelRetry(
             f"The HumbleBundle API call failed with error: {str(e)}. Please try again with a different approach or rephrase your request."
         )
+
+
+@homar.tool_plain(requires_approval=True)
+def update_marvin() -> str:
+    """Update Marvin bot by running git pull and make restart in the /Marvin directory.
+
+    This tool requires approval before execution. It will:
+    1. Run 'git pull' in /Marvin to fetch the latest changes from the repository
+    2. Run 'make restart' in /Marvin to restart the service with the new code
+
+    Returns:
+        Output from git pull and make restart commands, or an error message if either fails.
+    """
+    marvin_dir = "/Marvin"
+    results = []
+
+    try:
+        git_result = subprocess.run(
+            ["git", "pull"],
+            cwd=marvin_dir,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        results.append(f"git pull:\n{git_result.stdout}")
+        if git_result.returncode != 0:
+            return f"git pull failed:\n{git_result.stderr}"
+    except Exception as e:
+        return f"git pull error: {str(e)}"
+
+    try:
+        make_result = subprocess.run(
+            ["make", "restart"],
+            cwd=marvin_dir,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        results.append(f"make restart:\n{make_result.stdout}")
+        if make_result.returncode != 0:
+            return f"make restart failed:\n{make_result.stderr}"
+    except Exception as e:
+        return f"make restart error: {str(e)}"
+
+    return "\n".join(results)
 
 
 @homar.tool_plain(requires_approval=True)

@@ -1,4 +1,5 @@
 import os
+import subprocess
 from pydantic_ai import Agent, RunContext, DeferredToolRequests, ModelRetry
 from pydantic_ai.mcp import MCPServerStreamableHTTP, MCPServerSSE
 import httpx
@@ -240,6 +241,54 @@ async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
         raise ModelRetry(
             f"The HumbleBundle API call failed with error: {str(e)}. Please try again with a different approach or rephrase your request."
         )
+
+
+def _run_command_in_dir(label: str, command: list[str], cwd: str) -> tuple[str | None, str | None]:
+    """Run a command in a directory and return (stdout, error_message).
+
+    Returns:
+        (stdout, None) on success, or (None, error_message) on failure.
+    """
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            return None, f"{label} failed:\n{result.stderr}"
+        return result.stdout, None
+    except Exception as e:
+        return None, f"{label} error: {str(e)}"
+
+
+@homar.tool_plain(requires_approval=True)
+def update_marvin() -> str:
+    """Update Marvin bot by running git pull and make restart in the /Marvin directory.
+
+    This tool requires approval before execution. It will:
+    1. Run 'git pull' in /Marvin to fetch the latest changes from the repository
+    2. Run 'make restart' in /Marvin to restart the service with the new code
+
+    Returns:
+        Output from git pull and make restart commands, or an error message if either fails.
+    """
+    marvin_dir = "/Marvin"
+    results = []
+
+    stdout, error = _run_command_in_dir("git pull", ["git", "pull"], marvin_dir)
+    if error:
+        return error
+    results.append(f"git pull:\n{stdout}")
+
+    stdout, error = _run_command_in_dir("make restart", ["make", "restart"], marvin_dir)
+    if error:
+        return error
+    results.append(f"make restart:\n{stdout}")
+
+    return "\n".join(results)
 
 
 @homar.tool_plain(requires_approval=True)

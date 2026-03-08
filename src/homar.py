@@ -20,6 +20,7 @@ from src.agents_as_tools.image_generation_agent import image_generation_agent
 from src.agents_as_tools.google_calendar_agent import google_calendar_agent
 from src.agents_as_tools.humblebundle_agent import humblebundle_agent
 from src.delayed_message_scheduler import get_scheduler
+from src.cyclic_action_scheduler import get_cyclic_scheduler
 from src.models.schemas import MyDeps, UserType, GUEST_ALLOWED_TOOLS
 
 # Constants
@@ -243,7 +244,9 @@ async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
         )
 
 
-def _run_command_in_dir(label: str, command: list[str], cwd: str) -> tuple[str | None, str | None]:
+def _run_command_in_dir(
+    label: str, command: list[str], cwd: str
+) -> tuple[str | None, str | None]:
     """Run a command in a directory and return (stdout, error_message).
 
     Returns:
@@ -482,65 +485,296 @@ async def send_scheduled_message(
 
 @homar.tool(retries=2)
 async def list_scheduled_messages(ctx: RunContext[MyDeps]) -> str:
-    """List all scheduled messages that are pending delivery.
+    """List all scheduled messages and cyclic actions that are pending delivery.
 
     Use this tool when the user wants to see what messages/actions are scheduled.
     For example: "what messages are scheduled?" or "show me pending actions".
 
     Returns:
-        A formatted list of all scheduled messages with their IDs, scheduled times, and content
+        A formatted list of all scheduled messages and cyclic actions with their IDs and content
     """
     scheduler = get_scheduler()
+    cyclic_scheduler = get_cyclic_scheduler()
     scheduled = scheduler.get_scheduled_messages()
+    cyclic_actions = cyclic_scheduler.get_actions()
 
-    if not scheduled:
-        return "No scheduled messages pending."
-
-    # Get timezone for display
-    tz = ZoneInfo(scheduler.get_default_timezone())
+    if not scheduled and not cyclic_actions:
+        return "No scheduled messages or cyclic actions pending."
 
     result = []
-    result.append(f"Found {len(scheduled)} scheduled message(s):\n")
 
-    for message_id, delayed_msg in scheduled:
-        # Format the scheduled time
-        scheduled_str = delayed_msg.scheduled_time.strftime("%Y-%m-%d %H:%M:%S %Z")
+    if scheduled:
+        result.append(f"One-time scheduled messages ({len(scheduled)}):\n")
+        for message_id, delayed_msg in scheduled:
+            scheduled_str = delayed_msg.scheduled_time.strftime("%Y-%m-%d %H:%M:%S %Z")
+            actual_message = delayed_msg.message
+            if actual_message.startswith("[DELAYED_COMMAND] "):
+                actual_message = actual_message[len("[DELAYED_COMMAND] ") :]
+            result.append(f"- ID: {message_id}")
+            result.append(f"  Time: {scheduled_str}")
+            result.append(f"  Message: {actual_message}")
+            result.append("")
 
-        # Extract the actual message (removing the DELAYED_COMMAND marker)
-        actual_message = delayed_msg.message
-        if actual_message.startswith("[DELAYED_COMMAND] "):
-            actual_message = actual_message[len("[DELAYED_COMMAND] ") :]
-
-        result.append(f"- ID: {message_id}")
-        result.append(f"  Time: {scheduled_str}")
-        result.append(f"  Message: {actual_message}")
-        result.append("")
+    if cyclic_actions:
+        result.append(f"Cyclic actions ({len(cyclic_actions)}):\n")
+        for action_id, action in cyclic_actions:
+            runs_info = (
+                f"{action.run_count}/{action.max_runs}"
+                if action.max_runs
+                else str(action.run_count)
+            )
+            actual_message = action.message
+            if actual_message.startswith("[DELAYED_COMMAND] "):
+                actual_message = actual_message[len("[DELAYED_COMMAND] ") :]
+            result.append(f"- ID: {action_id}")
+            result.append(f"  Schedule: {action.schedule_description}")
+            result.append(f"  Runs: {runs_info}")
+            result.append(f"  Message: {actual_message}")
+            result.append("")
 
     return "\n".join(result)
 
 
 @homar.tool(retries=2)
 async def cancel_scheduled_message(ctx: RunContext[MyDeps], message_id: str) -> str:
-    """Cancel a scheduled message that hasn't been sent yet.
+    """Cancel a scheduled message or cyclic action that hasn't finished yet.
 
     Use this tool when the user wants to cancel a previously scheduled action.
-    For example: "cancel scheduled message delayed_1" or "cancel that reminder".
+    For example: "cancel scheduled message delayed_1" or "cancel cyclic action cyclic_1".
 
     Args:
-        message_id: The ID of the scheduled message to cancel (e.g., "delayed_1" or "scheduled_1")
+        message_id: The ID of the scheduled message or cyclic action to cancel
+                    (e.g., "delayed_1", "scheduled_1", or "cyclic_1")
 
     Returns:
         Confirmation that the message was cancelled or an error if not found
     """
+    # Try one-time scheduler first
     scheduler = get_scheduler()
-
-    success = scheduler.cancel_message(message_id)
-
-    if success:
+    if scheduler.cancel_message(message_id):
         logger.info(f"Cancelled scheduled message {message_id}")
         return f"Successfully cancelled scheduled message: {message_id}"
 
-    return f"Could not find scheduled message with ID: {message_id}. Use list_scheduled_messages to see available IDs."
+    # Try cyclic scheduler
+    cyclic_scheduler = get_cyclic_scheduler()
+    if cyclic_scheduler.cancel_action(message_id):
+        logger.info(f"Cancelled cyclic action {message_id}")
+        return f"Successfully cancelled cyclic action: {message_id}"
+
+    return (
+        f"Could not find scheduled message or cyclic action with ID: {message_id}. "
+        "Use list_scheduled_messages to see available IDs."
+    )
+
+
+@homar.tool(retries=2)
+async def schedule_cyclic_action(
+    ctx: RunContext[MyDeps],
+    message: str,
+    interval_hours: int = 0,
+    interval_minutes: int = 0,
+    interval_seconds: int = 0,
+    max_runs: int | None = None,
+) -> str:
+    """Schedule a message/command to be sent repeatedly at a fixed interval.
+
+    Use this tool when the user asks to repeat an action every N seconds/minutes/hours.
+    For example:
+    - "blink the light every 2 seconds for 10 times"
+    - "check the temperature every 30 minutes"
+    - "remind me every hour"
+
+    Args:
+        message: The message/command to send repeatedly
+        interval_hours: Hours between each run (default 0)
+        interval_minutes: Minutes between each run (default 0)
+        interval_seconds: Seconds between each run (default 0)
+        max_runs: Maximum number of times to run (None = unlimited, stop with cancel)
+
+    Returns:
+        Confirmation with the cyclic action ID
+    """
+    deps = ctx.deps
+
+    if not deps or not deps.thread_id or not deps.send_message_callback:
+        return "Error: Cannot schedule cyclic action - missing thread context"
+
+    if interval_hours < 0 or interval_minutes < 0 or interval_seconds < 0:
+        return "Error: Interval values must be non-negative"
+    if interval_minutes > 59 or interval_seconds > 59:
+        return "Error: Minutes and seconds must be 0-59"
+
+    total_seconds = interval_hours * 3600 + interval_minutes * 60 + interval_seconds
+
+    if total_seconds < 1:
+        return "Error: Interval must be at least 1 second"
+
+    if max_runs is not None and max_runs <= 0:
+        return "Error: max_runs must be a positive number"
+
+    cyclic_scheduler = get_cyclic_scheduler()
+    marked_message = f"[DELAYED_COMMAND] {message}"
+
+    try:
+        action_id = await cyclic_scheduler.schedule_interval(
+            message=marked_message,
+            thread_id=deps.thread_id,
+            interval_seconds=total_seconds,
+            send_callback=deps.send_message_callback,
+            max_runs=max_runs,
+        )
+
+        interval_str = _format_delay_seconds(total_seconds)
+        runs_str = f" (up to {max_runs} times)" if max_runs else " (until cancelled)"
+        logger.info(f"Scheduled cyclic action {action_id} every {interval_str}")
+        return (
+            f"Scheduled '{message}' to run every {interval_str}{runs_str}. "
+            f"ID: {action_id}"
+        )
+
+    except Exception as e:
+        logger.error(f"Error scheduling cyclic action: {e}")
+        return f"Error scheduling cyclic action: {str(e)}"
+
+
+@homar.tool(retries=2)
+async def schedule_daily_action(
+    ctx: RunContext[MyDeps],
+    message: str,
+    time_str: str,
+    days_interval: int = 1,
+    max_runs: int | None = None,
+) -> str:
+    """Schedule a message/command to be sent at a specific time every day (or every N days).
+
+    Use this tool when the user asks to perform an action at a specific time on a recurring basis.
+    For example:
+    - "turn the PC on every day at 7:00am"
+    - "remind me to take pills at 08:30 every day"
+    - "run backup every 7 days at 02:00"
+
+    Args:
+        message: The message/command to send at the scheduled time
+        time_str: Time of day in "HH:MM" format using 24-hour clock (e.g. "07:00", "14:30")
+        days_interval: How many days between each run (default 1 = every day, 7 = weekly)
+        max_runs: Maximum number of times to run (None = unlimited, stop with cancel)
+
+    Returns:
+        Confirmation with the cyclic action ID
+    """
+    deps = ctx.deps
+
+    if not deps or not deps.thread_id or not deps.send_message_callback:
+        return "Error: Cannot schedule daily action - missing thread context"
+
+    if days_interval <= 0:
+        return "Error: days_interval must be at least 1"
+
+    if max_runs is not None and max_runs <= 0:
+        return "Error: max_runs must be a positive number"
+
+    cyclic_scheduler = get_cyclic_scheduler()
+    marked_message = f"[DELAYED_COMMAND] {message}"
+
+    try:
+        action_id = await cyclic_scheduler.schedule_at_time(
+            message=marked_message,
+            thread_id=deps.thread_id,
+            time_str=time_str,
+            send_callback=deps.send_message_callback,
+            days_interval=days_interval,
+            max_runs=max_runs,
+        )
+
+        freq = "daily" if days_interval == 1 else f"every {days_interval} days"
+        runs_str = f" (up to {max_runs} times)" if max_runs else " (until cancelled)"
+        logger.info(f"Scheduled daily action {action_id} at {time_str} {freq}")
+        return (
+            f"Scheduled '{message}' to run at {time_str} {freq}{runs_str}. "
+            f"ID: {action_id}"
+        )
+
+    except ValueError as e:
+        return f"Error: {str(e)}"
+    except Exception as e:
+        logger.error(f"Error scheduling daily action: {e}")
+        return f"Error scheduling daily action: {str(e)}"
+
+
+@homar.tool(retries=2)
+async def schedule_random_action(
+    ctx: RunContext[MyDeps],
+    message: str,
+    start_hour: int,
+    end_hour: int,
+    days_interval: int = 1,
+    max_runs: int | None = None,
+) -> str:
+    """Schedule a message/command to run at a random time within a daily time window.
+
+    Use this tool when the user asks to perform an action at a random time within a range.
+    For example:
+    - "once a week at a random time during the day remind me to check my todo list"
+    - "remind me to drink water at a random time between 9am and 6pm"
+
+    Args:
+        message: The message/command to send at the random time
+        start_hour: Start of the daily window in 24-hour format (0-23, e.g. 9 for 9am)
+        end_hour: End of the daily window in 24-hour format (1-24, e.g. 18 for 6pm)
+        days_interval: How many days between each run (default 1 = every day, 7 = weekly)
+        max_runs: Maximum number of times to run (None = unlimited, stop with cancel)
+
+    Returns:
+        Confirmation with the cyclic action ID
+    """
+    deps = ctx.deps
+
+    if not deps or not deps.thread_id or not deps.send_message_callback:
+        return "Error: Cannot schedule random action - missing thread context"
+
+    if not (0 <= start_hour < end_hour <= 24):
+        return (
+            f"Error: Invalid window: start_hour={start_hour}, end_hour={end_hour}. "
+            "end_hour must be greater than start_hour and both must be in range 0-24."
+        )
+
+    if days_interval <= 0:
+        return "Error: days_interval must be at least 1"
+
+    if max_runs is not None and max_runs <= 0:
+        return "Error: max_runs must be a positive number"
+
+    cyclic_scheduler = get_cyclic_scheduler()
+    marked_message = f"[DELAYED_COMMAND] {message}"
+
+    try:
+        action_id = await cyclic_scheduler.schedule_random_window(
+            message=marked_message,
+            thread_id=deps.thread_id,
+            start_hour=start_hour,
+            end_hour=end_hour,
+            send_callback=deps.send_message_callback,
+            days_interval=days_interval,
+            max_runs=max_runs,
+        )
+
+        freq = "daily" if days_interval == 1 else f"every {days_interval} days"
+        runs_str = f" (up to {max_runs} times)" if max_runs else " (until cancelled)"
+        logger.info(
+            f"Scheduled random action {action_id} between {start_hour:02d}:00 "
+            f"and {end_hour:02d}:00 {freq}"
+        )
+        return (
+            f"Scheduled '{message}' to run at a random time between "
+            f"{start_hour:02d}:00 and {end_hour:02d}:00 {freq}{runs_str}. "
+            f"ID: {action_id}"
+        )
+
+    except ValueError as e:
+        return f"Error: {str(e)}"
+    except Exception as e:
+        logger.error(f"Error scheduling random action: {e}")
+        return f"Error scheduling random action: {str(e)}"
 
 
 async def run_homar_with_messages(

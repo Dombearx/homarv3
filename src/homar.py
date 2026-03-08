@@ -314,6 +314,37 @@ def calculate_sum(a: int, b: int) -> int:
 
 
 @homar.tool(retries=2)
+async def send_push_notification(ctx: RunContext[MyDeps], message: str) -> str:
+    """Send a push notification to the 'powiadomienia' Discord channel.
+
+    Use this tool when the user asks to send a push notification or an alert to the
+    notification channel. The message will always be delivered to the channel named
+    'powiadomienia'.
+
+    Args:
+        ctx: The run context, including usage metadata.
+        message: The notification message to send.
+
+    Returns:
+        Confirmation that the notification was sent, or an error message.
+    """
+    deps = ctx.deps
+
+    if not deps or not deps.send_notification_callback:
+        return "Error: Cannot send push notification - missing notification context"
+
+    try:
+        success = await deps.send_notification_callback(message)
+        if success:
+            logger.info(f"Push notification sent: {message}")
+            return "Push notification sent successfully to #powiadomienia"
+        return "Error: Could not find the 'powiadomienia' channel"
+    except Exception as e:
+        logger.error(f"Error sending push notification: {e}")
+        return f"Error sending push notification: {str(e)}"
+
+
+@homar.tool(retries=2)
 async def send_delayed_message(
     ctx: RunContext[MyDeps],
     message: str,

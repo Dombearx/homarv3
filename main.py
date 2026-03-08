@@ -92,6 +92,24 @@ async def _send_message_to_thread(message: str, thread_id: int):
         logger.error(f"Error sending message to thread {thread_id}: {e}")
 
 
+NOTIFICATION_CHANNEL_NAME = "powiadomienia"
+
+
+async def _send_notification_to_channel(message: str) -> bool:
+    """Send a push notification to the 'powiadomienia' channel.
+
+    Returns True on success, False if the channel was not found.
+    """
+    for guild in bot.guilds:
+        channel = discord.utils.get(guild.text_channels, name=NOTIFICATION_CHANNEL_NAME)
+        if channel is not None:
+            await channel.send(message)
+            logger.info(f"Sent push notification to #{NOTIFICATION_CHANNEL_NAME} in guild '{guild.name}'")
+            return True
+    logger.error(f"Could not find channel #{NOTIFICATION_CHANNEL_NAME} in any guild")
+    return False
+
+
 def _extract_text_content(message: discord.Message, is_delayed_command: bool) -> str:
     """Extract text content from message, handling delayed commands."""
     if is_delayed_command:
@@ -235,6 +253,7 @@ async def on_message(message: discord.Message):
             deps = MyDeps(
                 thread_id=thread.id,
                 send_message_callback=_send_message_to_thread,
+                send_notification_callback=_send_notification_to_channel,
                 username=username,
                 user_type=get_user_type_from_discord_roles(discord_role_names),
             )

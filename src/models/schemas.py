@@ -71,6 +71,7 @@ class MyDeps:
     mode: str = "standard"
     thread_id: int | None = None
     send_message_callback: Any | None = None
+    send_notification_callback: Any | None = None
     generated_images: list[str] | None = (
         None  # List of image file paths generated during run
     )

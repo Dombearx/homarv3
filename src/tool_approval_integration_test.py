@@ -127,7 +127,9 @@ class TestUpdateMarvinTool:
 
     def test_update_marvin_git_pull_exception(self):
         """Test update_marvin when git pull raises an exception."""
-        with patch("src.homar.subprocess.run", side_effect=FileNotFoundError("git not found")):
+        with patch(
+            "src.homar.subprocess.run", side_effect=FileNotFoundError("git not found")
+        ):
             result = update_marvin()
 
         assert "git pull error" in result

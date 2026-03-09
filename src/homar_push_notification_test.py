@@ -76,7 +76,10 @@ class TestSendPushNotification:
 
         result = await _send_push_notification_logic(deps, "Test message")
 
-        assert result == "Error: Cannot send push notification - missing notification context"
+        assert (
+            result
+            == "Error: Cannot send push notification - missing notification context"
+        )
 
     @pytest.mark.asyncio
     async def test_returns_error_when_callback_raises(self):

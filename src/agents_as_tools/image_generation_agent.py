@@ -31,6 +31,12 @@ Stwórz opis w języku angielskim zgodnie z opisanymi poniżej wytycznymi.
 {{guidelines}}
 """
 
+IMAGE_GENERATION_DIRECT_PROMPT = """
+Your task is to generate a detailed visual description for image generation based on the provided input.
+Create an evocative, richly detailed description in English suitable as a prompt for an AI image generation model.
+Include details about composition, lighting, style, atmosphere, and visual elements.
+"""
+
 settings = OpenAIResponsesModelSettings(
     openai_reasoning_effort="minimal",
     openai_reasoning_summary="concise",
@@ -43,13 +49,15 @@ image_generation_agent = Agent(
 
 @image_generation_agent.system_prompt
 async def get_system_prompt(ctx: RunContext[MyDeps]) -> str:
-    if not ctx.deps.mode or ctx.deps.mode == "horror":
+    if ctx.deps.mode == "horror":
         return IMAGE_GENERATION_AGENT_PROMPT.replace(
             "{{guidelines}}", HORROR_COSMIC_GUIDELINES
         )
-    return IMAGE_GENERATION_AGENT_PROMPT.replace(
-        "{{guidelines}}", DEFAULT_COSMIC_GUIDELINES
-    )
+    if ctx.deps.mode == "standard":
+        return IMAGE_GENERATION_AGENT_PROMPT.replace(
+            "{{guidelines}}", DEFAULT_COSMIC_GUIDELINES
+        )
+    return IMAGE_GENERATION_DIRECT_PROMPT
 
 
 def generate_image(prompt: str, short_image_title: str) -> str:

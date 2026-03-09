@@ -243,7 +243,9 @@ async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
         )
 
 
-def _run_command_in_dir(label: str, command: list[str], cwd: str) -> tuple[str | None, str | None]:
+def _run_command_in_dir(
+    label: str, command: list[str], cwd: str
+) -> tuple[str | None, str | None]:
     """Run a command in a directory and return (stdout, error_message).
 
     Returns:

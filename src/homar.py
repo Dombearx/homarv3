@@ -1,5 +1,4 @@
 import os
-import dataclasses
 import subprocess
 from pydantic_ai import Agent, RunContext, DeferredToolRequests, ModelRetry
 from pydantic_ai.mcp import MCPServerStreamableHTTP, MCPServerSSE
@@ -137,7 +136,7 @@ async def image_generation_api(ctx: RunContext[MyDeps], description: str) -> str
 
         r = await image_generation_agent.run(
             description,
-            deps=dataclasses.replace(ctx.deps, mode="direct"),
+            deps=ctx.deps,
             usage=ctx.usage,
         )
 

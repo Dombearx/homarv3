@@ -23,6 +23,7 @@ This is a Python-based Discord bot named "Homar" (Polish-speaking home assistant
 - Run tests with `make test` or `poetry run pytest`
 - Use `pytest-asyncio` for async test functions
 - Mock external dependencies (APIs, Discord, etc.) in tests
+- **Do not test constants** — only test behavior and logic, not static values
 
 ## Repository Structure
 

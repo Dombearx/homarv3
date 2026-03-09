@@ -3,7 +3,6 @@
 import pytest
 from unittest.mock import MagicMock
 from src.agents_as_tools.image_generation_agent import (
-    IMAGE_GENERATION_AGENT_PROMPT,
     IMAGE_GENERATION_DIRECT_PROMPT,
     get_system_prompt,
 )
@@ -50,24 +49,3 @@ class TestGetSystemPrompt:
         result = await get_system_prompt(ctx)
         assert result == IMAGE_GENERATION_DIRECT_PROMPT
         assert "sesji rpg" not in result
-
-
-class TestPromptConstants:
-    """Test that prompt constants contain expected content."""
-
-    def test_rpg_prompt_contains_rpg_reference(self):
-        """IMAGE_GENERATION_AGENT_PROMPT should reference RPG sessions."""
-        assert "sesji rpg" in IMAGE_GENERATION_AGENT_PROMPT
-
-    def test_rpg_prompt_has_guidelines_placeholder(self):
-        """IMAGE_GENERATION_AGENT_PROMPT should have a guidelines placeholder."""
-        assert "{{guidelines}}" in IMAGE_GENERATION_AGENT_PROMPT
-
-    def test_direct_prompt_has_no_rpg_reference(self):
-        """IMAGE_GENERATION_DIRECT_PROMPT should not reference RPG sessions."""
-        assert "sesji rpg" not in IMAGE_GENERATION_DIRECT_PROMPT
-        assert "rpg" not in IMAGE_GENERATION_DIRECT_PROMPT.lower()
-
-    def test_direct_prompt_has_no_guidelines_placeholder(self):
-        """IMAGE_GENERATION_DIRECT_PROMPT should not have a guidelines placeholder."""
-        assert "{{guidelines}}" not in IMAGE_GENERATION_DIRECT_PROMPT

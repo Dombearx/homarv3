@@ -68,7 +68,7 @@ class HealthResponse(BaseModel):
 class MyDeps:
     """Dependencies for agents."""
 
-    mode: str = "standard"
+    mode: str = "direct"
     thread_id: int | None = None
     send_message_callback: Any | None = None
     send_notification_callback: Any | None = None

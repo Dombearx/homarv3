@@ -33,7 +33,8 @@ homarv3/
 │   └── models/
 │       └── schemas.py          # Pydantic models
 ├── docs/
-│   └── DELAYED_MESSAGES.md     # Delayed message tool documentation
+│   ├── ADDING_AGENTS_AS_TOOLS.md  # Guide for creating agents as tools
+│   └── DELAYED_MESSAGES.md        # Delayed message tool documentation
 ├── main.py                     # Discord bot entry point
 ├── pyproject.toml              # Poetry configuration
 └── Dockerfile                  # Docker configuration
@@ -155,7 +156,9 @@ This runs `ruff format` on the codebase.
 
 ### Adding New Tools
 
-To add a new tool for the Homar agent:
+#### Simple Tools
+
+To add a simple tool for the Homar agent:
 
 1. Define the tool in `src/homar.py` using the `@homar.tool` decorator
 2. Implement the tool function with appropriate parameters and return type
@@ -166,10 +169,28 @@ Example:
 ```python
 @homar.tool
 async def my_new_tool(ctx: RunContext[MyDeps], parameter: str) -> str:
-    """Tool description for the AI to understand when to use it."""
+    """Tool description for the AI to understand when to use it.
+    
+    Args:
+        parameter: Description of the parameter.
+    
+    Returns:
+        The result as a string.
+    """
     # Implementation
     return "result"
 ```
+
+**Note**: The `ctx` parameter is passed automatically by PydanticAI and should NOT be documented in the docstring.
+
+#### Agents as Tools
+
+For more complex functionality, you can create specialized sub-agents and integrate them as tools. This is the recommended approach for:
+- External API integrations (Todoist, Home Assistant, Grocy, etc.)
+- Domain-specific functionality with its own instructions and tools
+- Modular, reusable components
+
+See the complete guide: [docs/ADDING_AGENTS_AS_TOOLS.md](docs/ADDING_AGENTS_AS_TOOLS.md)
 
 ## Architecture Notes
 

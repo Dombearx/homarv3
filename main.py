@@ -104,7 +104,9 @@ async def _send_notification_to_channel(message: str) -> bool:
         channel = discord.utils.get(guild.text_channels, name=NOTIFICATION_CHANNEL_NAME)
         if channel is not None:
             await channel.send(message)
-            logger.info(f"Sent push notification to #{NOTIFICATION_CHANNEL_NAME} in guild '{guild.name}'")
+            logger.info(
+                f"Sent push notification to #{NOTIFICATION_CHANNEL_NAME} in guild '{guild.name}'"
+            )
             return True
     logger.error(f"Could not find channel #{NOTIFICATION_CHANNEL_NAME} in any guild")
     return False

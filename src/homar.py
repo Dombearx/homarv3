@@ -19,6 +19,7 @@ from src.agents_as_tools.home_assistant_agent import home_assistant_agent
 from src.agents_as_tools.image_generation_agent import image_generation_agent
 from src.agents_as_tools.google_calendar_agent import google_calendar_agent
 from src.agents_as_tools.humblebundle_agent import humblebundle_agent
+from src.agents_as_tools.lichess_agent import lichess_agent
 from src.delayed_message_scheduler import get_scheduler
 from src.models.schemas import MyDeps, UserType, GUEST_ALLOWED_TOOLS
 
@@ -240,6 +241,41 @@ async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
         logger.warning(f"HumbleBundle API tool error: {e}")
         raise ModelRetry(
             f"The HumbleBundle API call failed with error: {str(e)}. Please try again with a different approach or rephrase your request."
+        )
+
+
+@homar.tool(retries=3)
+async def lichess_api(ctx: RunContext[MyDeps], command: str) -> str:
+    """Use this tool to interact with Lichess chess platform.
+
+    Capabilities:
+    - Manage chess move rules: add, list, remove rules that define automatic responses to opponent moves.
+    - Get information about ongoing Lichess games.
+    - Execute a move in a Lichess game.
+    - Check current game state and automatically apply any matching rules (useful for periodic polling).
+
+    Use when the user asks about chess, Lichess games, chess move rules, or wants to monitor a game.
+
+    Args:
+        ctx: The run context, including usage metadata.
+        command: The natural language command to execute.
+
+    Returns:
+        The response from the Lichess agent as a string.
+    """
+    try:
+        if error := _check_tool_access(ctx, "lichess_api"):
+            return error
+        r = await lichess_agent.run(
+            command,
+            deps=ctx.deps,
+            usage=ctx.usage,
+        )
+        return r.output
+    except Exception as e:
+        logger.warning(f"Lichess API tool error: {e}")
+        raise ModelRetry(
+            f"The Lichess API call failed with error: {str(e)}. Please try again with a different approach or rephrase your request."
         )
 
 

@@ -9,6 +9,7 @@ os.environ.setdefault("OPENAI_API_KEY", "fake-key-for-testing")
 os.environ.setdefault("RUNPOD_ENDPOINT_ID", "fake-endpoint-for-testing")
 os.environ.setdefault("RUNPOD_API_KEY", "fake-key-for-testing")
 os.environ.setdefault("DISCORD_TOKEN", "fake-token-for-testing")
+os.environ.setdefault("LICHESS_TOKEN", "fake-lichess-token-for-testing")
 
 # Mock logfire to avoid authentication issues during tests
 sys.modules["logfire"] = MagicMock()

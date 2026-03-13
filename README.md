@@ -145,6 +145,7 @@ The bot responds to messages in Discord channels and threads. It supports:
 6. **Delayed actions**: "Wyłącz światło za godzinę" (Turn off light in 1 hour)
 7. **GitHub issue creation**: "Create an issue about adding a weather feature" (creates a detailed, well-structured issue on the homarv3 repository)
 8. **RPG image generation**: In #rpg or #rpg2 channels
+7. **RPG image generation**: In #rpg or #rpg2 channels
 
 For more details on the delayed message feature, see [docs/DELAYED_MESSAGES.md](docs/DELAYED_MESSAGES.md).
 

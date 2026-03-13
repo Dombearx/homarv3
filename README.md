@@ -10,6 +10,7 @@ A Polish-speaking home assistant Discord bot powered by PydanticAI, with integra
 - **Google Calendar Integration**: Manage calendar events, appointments, and meetings
 - **HumbleBundle Integration**: Check available game, book, and software bundles from HumbleBundle.com
 - **Image Generation**: Generate RPG scene images
+- **GitHub Issue Creation**: Create high-quality, detailed GitHub issues on the homarv3 repository (see [docs/GITHUB_ISSUES.md](docs/GITHUB_ISSUES.md))
 - **Delayed Message Tool**: Schedule commands to be executed after a specified delay (see [docs/DELAYED_MESSAGES.md](docs/DELAYED_MESSAGES.md))
 - **Conversation History**: Maintains context within Discord threads
 - **Multi-Agent Architecture**: Specialized sub-agents for different tasks
@@ -23,6 +24,7 @@ homarv3/
 │   │   ├── todoist_agent.py     # Todoist API integration
 │   │   ├── home_assistant_agent.py  # Home Assistant control
 │   │   ├── grocy_agent.py       # Grocy groceries management
+│   │   ├── github_issue_agent.py  # GitHub issue creation
 │   │   ├── google_calendar_agent.py  # Google Calendar integration
 │   │   ├── humblebundle_agent.py    # HumbleBundle deals checker
 │   │   └── image_generation_agent.py  # RPG image generation
@@ -63,6 +65,8 @@ homarv3/
    DISCORD_TOKEN=your_discord_bot_token
    TODOIST_TOKEN=your_todoist_token
    OPENAI_API_KEY=your_openai_api_key
+   GITHUB_TOKEN=your_github_token
+   GITHUB_REPO=Dombearx/homarv3  # Optional, defaults to Dombearx/homarv3
    GOOGLE_CALENDAR_CREDENTIALS_PATH=/path/to/credentials.json
    # Add other required tokens
    ```
@@ -139,6 +143,8 @@ The bot responds to messages in Discord channels and threads. It supports:
 4. **Calendar management**: "Co mam w kalendarzu jutro?" (What's on my calendar tomorrow?)
 5. **HumbleBundle deals**: "Pokaż aktualne bundle na HumbleBundle" (Show current HumbleBundle deals)
 6. **Delayed actions**: "Wyłącz światło za godzinę" (Turn off light in 1 hour)
+7. **GitHub issue creation**: "Create an issue about adding a weather feature" (creates a detailed, well-structured issue on the homarv3 repository)
+8. **RPG image generation**: In #rpg or #rpg2 channels
 7. **RPG image generation**: In #rpg or #rpg2 channels
 
 For more details on the delayed message feature, see [docs/DELAYED_MESSAGES.md](docs/DELAYED_MESSAGES.md).

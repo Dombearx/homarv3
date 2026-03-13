@@ -8,15 +8,16 @@ import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
-from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart
+from pydantic_ai import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
-from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
+from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from loguru import logger
 
 load_dotenv()
 from src.agents_as_tools.todoist_agent import todoist_agent
 from src.agents_as_tools.home_assistant_agent import home_assistant_agent
 from src.agents_as_tools.image_generation_agent import image_generation_agent
+from src.agents_as_tools.github_issue_agent import github_issue_agent
 from src.agents_as_tools.google_calendar_agent import google_calendar_agent
 from src.agents_as_tools.humblebundle_agent import humblebundle_agent
 from src.delayed_message_scheduler import get_scheduler
@@ -307,6 +308,24 @@ def approval_test_tool(test_parameter: str) -> str:
         A success message if approved
     """
     return f"Test tool executed successfully with parameter: {test_parameter}"
+
+
+@homar.tool
+async def github_issue_api(ctx: RunContext[MyDeps], description: str) -> str:
+    """Use this tool to create GitHub issues on the homarv3 repository.
+    This tool helps create high-quality, detailed, and well-structured GitHub issues for bug reports, feature requests, or any other repository issues.
+
+    Args:
+        description: The description of the issue to create (can be brief - the agent will expand it into a detailed issue).
+
+    Returns:
+        The response confirming issue creation with issue number and URL.
+    """
+    r = await github_issue_agent.run(
+        description,
+        usage=ctx.usage,
+    )
+    return r.output
 
 
 @homar.tool_plain

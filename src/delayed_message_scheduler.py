@@ -3,7 +3,11 @@
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from loguru import logger
+
+# Default timezone for scheduling (Europe/Warsaw - CET/CEST)
+DEFAULT_TIMEZONE = "Europe/Warsaw"
 
 
 @dataclass
@@ -63,6 +67,57 @@ class DelayedMessageScheduler:
 
         return message_id
 
+    async def schedule_message_at(
+        self, message: str, thread_id: int, scheduled_time: datetime, send_callback
+    ) -> str:
+        """
+        Schedule a message to be sent at a specific date and time.
+
+        Args:
+            message: The message content to send
+            thread_id: The Discord thread ID to send the message to
+            scheduled_time: The datetime when the message should be sent (timezone-aware or naive)
+            send_callback: Async function to call to send the message
+
+        Returns:
+            A unique identifier for this scheduled message
+        """
+        # Calculate delay in seconds
+        # If scheduled_time is naive, treat it as DEFAULT_TIMEZONE
+        if scheduled_time.tzinfo is None:
+            tz = ZoneInfo(DEFAULT_TIMEZONE)
+            scheduled_time = scheduled_time.replace(tzinfo=tz)
+
+        # Get current time in UTC and convert to the target timezone for comparison
+        now = datetime.now(tz=scheduled_time.tzinfo)
+        delay = (scheduled_time - now).total_seconds()
+
+        if delay <= 0:
+            raise ValueError("Scheduled time must be in the future")
+
+        self._message_counter += 1
+        message_id = f"scheduled_{self._message_counter}"
+
+        # Create the delayed message object
+        delayed_msg = DelayedMessage(
+            message=message, thread_id=thread_id, scheduled_time=scheduled_time
+        )
+
+        # Schedule the task
+        task = asyncio.create_task(
+            self._send_delayed_message(message_id, int(delay), send_callback)
+        )
+        delayed_msg.task = task
+
+        self._scheduled_messages[message_id] = delayed_msg
+
+        logger.info(
+            f"Scheduled message {message_id} for thread {thread_id} "
+            f"to be sent at {scheduled_time.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+
+        return message_id
+
     async def _send_delayed_message(
         self, message_id: str, delay_seconds: int, send_callback
     ):
@@ -88,8 +143,11 @@ class DelayedMessageScheduler:
 
         except asyncio.CancelledError:
             logger.info(f"Delayed message {message_id} was cancelled")
+            # Message may already be removed by cancel_message()
             if message_id in self._scheduled_messages:
                 del self._scheduled_messages[message_id]
+            # Re-raise to propagate cancellation signal properly through asyncio
+            raise
         except Exception as e:
             logger.error(f"Error sending delayed message {message_id}: {e}")
             if message_id in self._scheduled_messages:
@@ -108,6 +166,9 @@ class DelayedMessageScheduler:
         delayed_msg = self._scheduled_messages.get(message_id)
         if delayed_msg and delayed_msg.task:
             delayed_msg.task.cancel()
+            # Remove from dict immediately - the task will handle CancelledError on its own
+            if message_id in self._scheduled_messages:
+                del self._scheduled_messages[message_id]
             logger.info(f"Cancelled delayed message {message_id}")
             return True
         return False
@@ -115,6 +176,10 @@ class DelayedMessageScheduler:
     def get_scheduled_messages(self) -> list[tuple[str, DelayedMessage]]:
         """Get all currently scheduled messages."""
         return list(self._scheduled_messages.items())
+
+    def get_default_timezone(self) -> str:
+        """Get the default timezone for scheduling."""
+        return DEFAULT_TIMEZONE
 
 
 # Global instance

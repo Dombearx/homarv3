@@ -31,6 +31,12 @@ Stwórz opis w języku angielskim zgodnie z opisanymi poniżej wytycznymi.
 {{guidelines}}
 """
 
+IMAGE_GENERATION_DIRECT_PROMPT = """
+Your task is to generate a detailed visual description for image generation based on the provided input.
+Create an evocative, richly detailed description in English suitable as a prompt for an AI image generation model.
+Include details about composition, lighting, style, atmosphere, and visual elements.
+"""
+
 settings = OpenAIResponsesModelSettings(
     openai_reasoning_effort="minimal",
     openai_reasoning_summary="concise",
@@ -43,14 +49,15 @@ image_generation_agent = Agent(
 
 @image_generation_agent.system_prompt
 async def get_system_prompt(ctx: RunContext[MyDeps]) -> str:
+    if ctx.deps.mode == "horror":
+        return IMAGE_GENERATION_AGENT_PROMPT.replace(
+            "{{guidelines}}", HORROR_COSMIC_GUIDELINES
+        )
     if ctx.deps.mode == "standard":
         return IMAGE_GENERATION_AGENT_PROMPT.replace(
             "{{guidelines}}", DEFAULT_COSMIC_GUIDELINES
         )
-
-    return IMAGE_GENERATION_AGENT_PROMPT.replace(
-        "{{guidelines}}", HORROR_COSMIC_GUIDELINES
-    )
+    return IMAGE_GENERATION_DIRECT_PROMPT
 
 
 def generate_image(prompt: str, short_image_title: str) -> str:
@@ -62,13 +69,14 @@ def generate_image(prompt: str, short_image_title: str) -> str:
         workflow = json.load(f)
 
     seed = os.urandom(2)
-    workflow["31"]["inputs"]["seed"] = int.from_bytes(seed, "big")
+    seed_int = int.from_bytes(seed, "big")
+    workflow["31"]["inputs"]["seed"] = seed_int
     workflow["6"]["inputs"]["text"] = prompt
 
     payload = {
         "input": {
             "prompt": prompt,
-            "seed": 12345,
+            "seed": seed_int,
             "guidance": 7.5,
             "width": 1920,
             "height": 1088,
@@ -76,9 +84,6 @@ def generate_image(prompt: str, short_image_title: str) -> str:
     }
 
     start_time = asyncio.get_event_loop().time()
-    # run_request = endpoint.run(
-    #     {"input": {"workflow": workflow}}
-    # )
     print("Sending request to endpoint")
     run_request = endpoint.run(payload)
 
@@ -93,40 +98,8 @@ def generate_image(prompt: str, short_image_title: str) -> str:
 
     image = result["image"]
 
-    upscale_payload = {
-        "input": {
-            "source_image": image,
-            "model": "RealESRGAN_x4plus",
-            "scale": 2,
-            "face_enhance": False,
-        }
-    }
-
     with open(IMAGE_GENERATION_OUTPUT_DIR / f"{0}_{image_filename}", "wb") as f:
         f.write(base64.b64decode(image))
-
-    # start_time = asyncio.get_event_loop().time()
-    # # run_request = endpoint.run(
-    # #     {"input": {"workflow": workflow}}
-    # # )
-    # print("Sending request to upscale endpoint")
-    # run_request = upscale_endpoint.run(
-    #     upscale_payload
-    # )
-    # while run_request.status() != "COMPLETED":
-    #     await asyncio.sleep(1)
-    # result = run_request.output()
-    # end_time = asyncio.get_event_loop().time()
-    # print(f"Image upscaling completed in {end_time - start_time:.2f} seconds.")
-
-    # image = result["image"]
-
-    # with open(IMAGE_GENERATION_OUTPUT_DIR / f"{0}_{image_filename}", "wb") as f:
-    #     f.write(base64.b64decode(image))
-
-    # # for i, image in enumerate(result["images"]):
-    # #     with open(IMAGE_GENERATION_OUTPUT_DIR / f"{i}_{image_filename}", "wb") as f:
-    # #         f.write(base64.b64decode(image["data"]))
 
     return f"0_{image_filename}"
 

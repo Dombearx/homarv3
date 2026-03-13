@@ -1,7 +1,7 @@
 .PHONY: run format test docker_build docker_save manage_remote deploy
 
 run:
-	poetry run uvicorn main:app --host 0.0.0.0 --port 8070 --reload
+	poetry run python main.py
 
 format:
 	poetry run ruff format .

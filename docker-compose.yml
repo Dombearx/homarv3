@@ -12,4 +12,5 @@ services:
     restart: unless-stopped
     volumes:
       - ./.env:/app/.env:ro
+      - /home/domin/Marvin:/Marvin
 

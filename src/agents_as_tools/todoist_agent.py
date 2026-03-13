@@ -1,8 +1,12 @@
 from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerStreamableHTTP
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import os
 from pydantic_ai.models.openai import OpenAIResponsesModelSettings
+
+# Default timezone for date/time operations
+DEFAULT_TIMEZONE = "Europe/Warsaw"
 
 todoist_mcp_server = MCPServerStreamableHTTP(
     "https://ai.todoist.net/mcp",
@@ -35,4 +39,6 @@ todoist_agent = Agent(
 
 @todoist_agent.instructions
 def add_current_date() -> str:
-    return f"Today is {date.today()}."
+    tz = ZoneInfo(DEFAULT_TIMEZONE)
+    today = datetime.now(tz=tz).date()
+    return f"Today is {today}."

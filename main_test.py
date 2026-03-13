@@ -66,25 +66,34 @@ class TestGetActualMessage:
         """Test getting message content from regular message."""
         mock_message = Mock()
         mock_message.content = "Hello, world!"
+        mock_message.attachments = []
 
         result = _get_actual_message(mock_message, is_delayed_command=False)
-        assert result == "Hello, world!"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0] == "Hello, world!"
 
     def test_get_actual_message_delayed(self):
         """Test getting message content from delayed command."""
         mock_message = Mock()
         mock_message.content = f"{DELAYED_COMMAND_MARKER} Turn off the lights"
+        mock_message.attachments = []
 
         result = _get_actual_message(mock_message, is_delayed_command=True)
-        assert result == "Turn off the lights"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0] == "Turn off the lights"
 
     def test_get_actual_message_delayed_with_extra_spaces(self):
         """Test delayed message strips extra spaces."""
         mock_message = Mock()
         mock_message.content = f"{DELAYED_COMMAND_MARKER}   Turn off the lights   "
+        mock_message.attachments = []
 
         result = _get_actual_message(mock_message, is_delayed_command=True)
-        assert result == "Turn off the lights"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0] == "Turn off the lights"
 
     def test_get_actual_message_delayed_multiword(self):
         """Test delayed message with complex content."""
@@ -92,6 +101,98 @@ class TestGetActualMessage:
         mock_message.content = (
             f"{DELAYED_COMMAND_MARKER} This is a complex message with many words"
         )
+        mock_message.attachments = []
 
         result = _get_actual_message(mock_message, is_delayed_command=True)
-        assert result == "This is a complex message with many words"
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0] == "This is a complex message with many words"
+
+    def test_get_actual_message_with_image(self):
+        """Test message with image attachment."""
+        from pydantic_ai import ImageUrl
+
+        mock_message = Mock()
+        mock_message.content = "Look at this image"
+        mock_attachment = Mock()
+        mock_attachment.content_type = "image/png"
+        mock_attachment.url = "https://example.com/image.png"
+        mock_message.attachments = [mock_attachment]
+
+        result = _get_actual_message(mock_message, is_delayed_command=False)
+
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result[0] == "Look at this image"
+        assert isinstance(result[1], ImageUrl)
+        assert result[1].url == "https://example.com/image.png"
+
+    def test_get_actual_message_image_only(self):
+        """Test message with only image, no text."""
+        from pydantic_ai import ImageUrl
+
+        mock_message = Mock()
+        mock_message.content = ""
+        mock_attachment = Mock()
+        mock_attachment.content_type = "image/jpeg"
+        mock_attachment.url = "https://example.com/photo.jpg"
+        mock_message.attachments = [mock_attachment]
+
+        result = _get_actual_message(mock_message, is_delayed_command=False)
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert isinstance(result[0], ImageUrl)
+        assert result[0].url == "https://example.com/photo.jpg"
+
+    def test_get_actual_message_multiple_images(self):
+        """Test message with multiple images."""
+        from pydantic_ai import ImageUrl
+
+        mock_message = Mock()
+        mock_message.content = "Check these out"
+        mock_attachment1 = Mock()
+        mock_attachment1.content_type = "image/png"
+        mock_attachment1.url = "https://example.com/image1.png"
+        mock_attachment2 = Mock()
+        mock_attachment2.content_type = "image/jpeg"
+        mock_attachment2.url = "https://example.com/image2.jpg"
+        mock_message.attachments = [mock_attachment1, mock_attachment2]
+
+        result = _get_actual_message(mock_message, is_delayed_command=False)
+
+        assert isinstance(result, list)
+        assert len(result) == 3
+        assert result[0] == "Check these out"
+        assert isinstance(result[1], ImageUrl)
+        assert result[1].url == "https://example.com/image1.png"
+        assert isinstance(result[2], ImageUrl)
+        assert result[2].url == "https://example.com/image2.jpg"
+
+    def test_get_actual_message_non_image_attachment(self):
+        """Test message with non-image attachment (should be ignored)."""
+        mock_message = Mock()
+        mock_message.content = "Here's a PDF"
+        mock_attachment = Mock()
+        mock_attachment.content_type = "application/pdf"
+        mock_attachment.url = "https://example.com/document.pdf"
+        mock_message.attachments = [mock_attachment]
+
+        result = _get_actual_message(mock_message, is_delayed_command=False)
+
+        # Non-image attachments should be ignored
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0] == "Here's a PDF"
+
+    def test_get_actual_message_empty(self):
+        """Test message with no content."""
+        mock_message = Mock()
+        mock_message.content = ""
+        mock_message.attachments = []
+
+        result = _get_actual_message(mock_message, is_delayed_command=False)
+
+        # Empty message should return empty list
+        assert isinstance(result, list)
+        assert len(result) == 0

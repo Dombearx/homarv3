@@ -12,5 +12,4 @@ services:
     restart: unless-stopped
     volumes:
       - ./.env:/app/.env:ro
-      - /home/domin/Marvin:/Marvin
-
+      - /home/domin/.ssh/marvin_deploy_key:/app/deploy_key:ro

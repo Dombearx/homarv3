@@ -116,12 +116,24 @@ async def request_approval(
         message_parts.append(f"**Parameters:**")
 
         # Format the arguments nicely
-        for key, value in call.args.items():
-            # Truncate long values
-            value_str = str(value)
-            if len(value_str) > 100:
-                value_str = value_str[:97] + "..."
-            message_parts.append(f"  • {key}: `{value_str}`")
+        # Handle args being either a dict or a string (JSON serialized)
+        args_dict = call.args
+        if isinstance(args_dict, str):
+            try:
+                import json
+                args_dict = json.loads(args_dict)
+            except (json.JSONDecodeError, TypeError):
+                # If it's not valid JSON, just treat it as a single value
+                message_parts.append(f"  • value: `{args_dict}`")
+                args_dict = {}
+        
+        if isinstance(args_dict, dict):
+            for key, value in args_dict.items():
+                # Truncate long values
+                value_str = str(value)
+                if len(value_str) > 100:
+                    value_str = value_str[:97] + "..."
+                message_parts.append(f"  • {key}: `{value_str}`")
 
         # Include metadata if available
         if (

@@ -173,3 +173,40 @@ class TestToolApprovalIntegration:
         assert hasattr(request, "metadata")
         assert len(request.approvals) == 1
         assert request.approvals[0].tool_call_id == "call_id"
+
+    @pytest.mark.asyncio
+    async def test_request_approval_with_string_args(self):
+        """Test that approval request handles args as JSON string (edge case)."""
+        # This can happen in some serialization scenarios
+        import json
+
+        mock_thread = MagicMock()
+        mock_thread.send = AsyncMock()
+        mock_message = MagicMock()
+        mock_message.id = 12345
+        mock_thread.send.return_value = mock_message
+
+        # Create a deferred request with args as a JSON string
+        json_args = json.dumps({"param1": "value1", "param2": "value2"})
+        request = DeferredToolRequests(
+            calls=[],
+            approvals=[
+                ToolCallPart(
+                    tool_name="test_tool",
+                    args=json_args,  # String instead of dict
+                    tool_call_id="call_1",
+                )
+            ],
+        )
+
+        # Should handle without raising "'str' object has no attribute 'items'" error
+        with patch("asyncio.wait_for", side_effect=TimeoutError):
+            result = await request_approval(mock_thread, request)
+
+        # Verify message was sent successfully
+        mock_thread.send.assert_called_once()
+        call_args = mock_thread.send.call_args
+        message_content = call_args[0][0]
+
+        # Should contain the tool name
+        assert "test_tool" in message_content

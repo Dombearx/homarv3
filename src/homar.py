@@ -243,21 +243,13 @@ async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
         )
 
 
-def _run_command_in_dir(
-    label: str, command: list[str], cwd: str
-) -> tuple[str | None, str | None]:
-    """Run a command in a directory and return (stdout, error_message).
-
-    Returns:
-        (stdout, None) on success, or (None, error_message) on failure.
-    """
+def _run_ssh_command(label: str, command: list[str]) -> tuple[str | None, str | None]:
     try:
         result = subprocess.run(
             command,
-            cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=120,
         )
         if result.returncode != 0:
             return None, f"{label} failed:\n{result.stderr}"
@@ -268,29 +260,22 @@ def _run_command_in_dir(
 
 @homar.tool_plain(requires_approval=True)
 def update_marvin() -> str:
-    """Update Marvin bot by running git pull and make restart in the /Marvin directory.
-
-    This tool requires approval before execution. It will:
-    1. Run 'git pull' in /Marvin to fetch the latest changes from the repository
-    2. Run 'make restart' in /Marvin to restart the service with the new code
-
-    Returns:
-        Output from git pull and make restart commands, or an error message if either fails.
     """
-    marvin_dir = "/Marvin"
-    results = []
+    Update Marvin by calling update script on host via SSH.
+    """
+    ssh_command = [
+        "ssh",
+        "-i", "/app/deploy_key",
+        "-o", "StrictHostKeyChecking=no",
+        "domin@172.17.0.1",
+        "/home/domin/update_marvin.sh",
+    ]
 
-    stdout, error = _run_command_in_dir("git pull", ["git", "pull"], marvin_dir)
+    stdout, error = _run_ssh_command("remote update_marvin.sh", ssh_command)
     if error:
         return error
-    results.append(f"git pull:\n{stdout}")
 
-    stdout, error = _run_command_in_dir("make restart", ["make", "restart"], marvin_dir)
-    if error:
-        return error
-    results.append(f"make restart:\n{stdout}")
-
-    return "\n".join(results)
+    return f"Remote update successful:\n{stdout}"
 
 
 @homar.tool_plain(requires_approval=True)

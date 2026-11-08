@@ -26,6 +26,9 @@ COPY src/ ./src/
 COPY gcp-oauth.keys.json ./
 COPY mcp-google-calendar-token.json ./
 
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Run the application
 CMD ["poetry", "run", "python", "main.py"] 

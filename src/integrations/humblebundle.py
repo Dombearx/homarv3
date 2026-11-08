@@ -1,56 +1,9 @@
-"""HumbleBundle agent for checking available bundles."""
+"""HumbleBundle scraping helpers and tools for checking available bundles."""
 
 import re
-from datetime import date
-from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 import httpx
 from bs4 import BeautifulSoup
 from loguru import logger
-
-HUMBLEBUNDLE_AGENT_PROMPT = """
-You are an interface to check Humble Bundle deals and bundles.
-
-You can:
-1. List all currently available bundles (games, books, software) from humblebundle.com
-2. Get details about specific bundles
-
-When listing bundles, provide:
-- Bundle name
-- Bundle type (games, books, software)
-- Link to the bundle
-- Brief description if available
-
-When getting bundle details, provide:
-- Full bundle name
-- Type
-- Direct link
-- Description
-- Price tiers if visible
-- Content included if available
-
-Always provide the direct link so users can visit humblebundle.com to see full details and purchase.
-
-As a response, briefly summarize the available bundles or bundle details.
-Do not ask follow up questions.
-"""
-
-settings = OpenAIResponsesModelSettings(
-    openai_reasoning_effort="minimal",
-    openai_reasoning_summary="concise",
-)
-
-humblebundle_agent = Agent(
-    "openai:gpt-5-mini",
-    instructions=HUMBLEBUNDLE_AGENT_PROMPT,
-    model_settings=settings,
-)
-
-
-@humblebundle_agent.instructions
-def add_current_date() -> str:
-    """Add current date to agent context."""
-    return f"Today is {date.today()}."
 
 
 def _get_category(product_url: str) -> str:
@@ -273,7 +226,6 @@ def _get_bundles_data(bundle_type: str = "all") -> list[dict]:
     return bundles
 
 
-@humblebundle_agent.tool_plain
 def list_bundles(bundle_type: str = "all") -> str:
     """
     List currently available bundles from HumbleBundle.com.
@@ -301,7 +253,6 @@ def list_bundles(bundle_type: str = "all") -> str:
         return f"Error listing bundles: {str(e)}. Please visit https://www.humblebundle.com/bundles directly."
 
 
-@humblebundle_agent.tool_plain
 def get_bundle_details(bundle_name: str) -> str:
     """
     Get detailed information about a specific bundle.

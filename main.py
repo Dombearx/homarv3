@@ -66,6 +66,20 @@ intents.messages = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
+def _split_message(text: str, limit: int = 2000) -> list[str]:
+    """Split text into Discord-sized chunks, preferring line breaks."""
+    chunks = []
+    while len(text) > limit:
+        cut = text.rfind("\n", 0, limit)
+        if cut <= 0:
+            cut = limit
+        chunks.append(text[:cut])
+        text = text[cut:].lstrip("\n")
+    if text:
+        chunks.append(text)
+    return chunks
+
+
 def _sanitize_thread_name(s: str, max_len: int = 30) -> str:
     s = re.sub(r"\s+", " ", (s or "").strip())
     s = re.sub(r"[^\w\- ,.()]+", "", s)
@@ -162,13 +176,18 @@ def _create_user_message_request(content: list) -> ModelRequest:
     return ModelRequest(parts=[UserPromptPart(content=content)])
 
 
-async def _get_thread_history(thread: discord.Thread) -> list:
+async def _get_thread_history(
+    thread: discord.Thread, exclude_message_id: int | None = None
+) -> list:
     """Fetch message history from Discord thread and convert to ModelMessage format."""
     # Fetch last 100 messages from thread
     messages = []
     async for msg in thread.history(limit=100):
         # Skip system messages, include both user and bot messages
         if msg.type != discord.MessageType.default:
+            continue
+        # The message being answered is sent separately as the new prompt
+        if msg.id == exclude_message_id:
             continue
 
         # Create appropriate message type based on author
@@ -217,7 +236,9 @@ async def on_message(message: discord.Message):
         image_description = await image_generation_agent.run(
             message.content, deps=MyDeps(mode=mode)
         )
-        image_filename = generate_image(image_description.output, "rpg_scene")
+        image_filename = await asyncio.to_thread(
+            generate_image, image_description.output, "rpg_scene"
+        )
         logger.info(f"Generated {mode} RPG image: {image_filename}")
         try:
             async with httpx.AsyncClient() as client:
@@ -247,7 +268,7 @@ async def on_message(message: discord.Message):
             actual_message = _get_actual_message(message, is_delayed_command)
 
             # Fetch thread history from Discord instead of external database
-            thread_history = await _get_thread_history(thread)
+            thread_history = await _get_thread_history(thread, message.id)
 
             # Create deps with thread context for delayed message support
             username = message.author.display_name
@@ -258,46 +279,26 @@ async def on_message(message: discord.Message):
                 send_notification_callback=_send_notification_to_channel,
                 username=username,
                 user_type=get_user_type_from_discord_roles(discord_role_names),
+                approval_callback=lambda requests: request_approval(thread, requests),
             )
 
-            # Note: We ignore the updated history (_) as we fetch it fresh from Discord on each message
             (
-                response_output,
-                new_messages,
+                response_message,
+                _,
                 generated_images,
             ) = await run_homar_with_history(
                 new_message=actual_message, history=thread_history, deps=deps
             )
 
-            # Check if we got a deferred tool request (approval needed)
-            if isinstance(response_output, DeferredToolRequests):
-                logger.info(
-                    f"Agent requires approval for {len(response_output.approvals)} tool(s)"
+            if isinstance(response_message, DeferredToolRequests):
+                # Only happens when no approval callback handled the request
+                response_message = (
+                    "Ta akcja wymaga zatwierdzenia, ale nie udało się o nie zapytać."
                 )
 
-                # Request user approval via Discord UI
-                approval_results = await request_approval(thread, response_output)
-
-                # Continue the agent run with approval results
-                # Use the message history from the first run
-                from src.homar import homar
-
-                agent_response = await homar.run(
-                    message_history=new_messages,
-                    deferred_tool_results=approval_results,
-                    deps=deps,
-                )
-                response_message = agent_response.output
-
-                # Update generated images if any were created
-                if deps.generated_images:
-                    generated_images = deps.generated_images
-            else:
-                # Normal string response
-                response_message = response_output
-
-            # Send text response
-            await thread.send(response_message)
+            # Send text response (Discord limits messages to 2000 characters)
+            for chunk in _split_message(response_message):
+                await thread.send(chunk)
 
             # Send any generated images as attachments
             if generated_images:

@@ -12,23 +12,25 @@ A Polish-speaking home assistant Discord bot powered by PydanticAI, with integra
 - **Image Generation**: Generate RPG scene images
 - **Delayed Message Tool**: Schedule commands to be executed after a specified delay (see [docs/DELAYED_MESSAGES.md](docs/DELAYED_MESSAGES.md))
 - **Conversation History**: Maintains context within Discord threads
-- **Multi-Agent Architecture**: Specialized sub-agents for different tasks
+- **On-Demand Capabilities**: One agent sees a short catalog of capabilities (Home Assistant, Todoist, Calendar, Grocy, images, HumbleBundle) and loads a capability's instructions and tools only when a request needs it (pydantic-ai v2 `defer_loading`)
 
 ## Project Structure
 
 ```
 homarv3/
 ├── src/
-│   ├── agents_as_tools/         # Specialized sub-agents
-│   │   ├── todoist_agent.py     # Todoist API integration
-│   │   ├── home_assistant_agent.py  # Home Assistant control
-│   │   ├── grocy_agent.py       # Grocy groceries management
-│   │   ├── google_calendar_agent.py  # Google Calendar integration
-│   │   ├── humblebundle_agent.py    # HumbleBundle deals checker
-│   │   └── image_generation_agent.py  # RPG image generation
+│   ├── capabilities/            # On-demand capabilities (instructions + tools per domain)
+│   │   ├── home_assistant.py    # Home Assistant MCP + live device state
+│   │   ├── todoist.py           # Todoist API v1 tools (shopping lists as task + subtasks)
+│   │   ├── google_calendar.py   # Google Calendar MCP (npx @cocal/google-calendar-mcp)
+│   │   ├── grocy.py             # Grocy stock management
+│   │   ├── image_generation.py  # Image generation via RunPod
+│   │   └── humblebundle.py      # HumbleBundle deals
+│   ├── agents_as_tools/         # Image prompt-writing agent, RPG prompts, ComfyUI workflow
+│   ├── integrations/            # HumbleBundle scraping helpers
 │   ├── delayed_message_scheduler.py  # Delayed message scheduling
 │   ├── displayer/               # FastAPI image viewer service
-│   ├── grocy_mcp/              # Grocy MCP server
+│   ├── grocy_mcp/              # Grocy API functions
 │   ├── homar.py                # Main Homar agent
 │   └── models/
 │       └── schemas.py          # Pydantic models

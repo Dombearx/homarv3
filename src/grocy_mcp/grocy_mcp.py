@@ -1,6 +1,4 @@
 from datetime import datetime
-from datetime import datetime
-from fastmcp import FastMCP
 
 from src.grocy_mcp.models import (
     CreateProductInput,
@@ -53,10 +51,6 @@ def get_product(product_name: str) -> int:
     return DEFAULT_NOT_FOUND_MESSAGE
 
 
-mcp = FastMCP("Grocy MCP Server")
-
-
-@mcp.tool()
 def create_product(args: CreateProductInput) -> str:
     """
     Create a new product in Grocy.
@@ -77,7 +71,6 @@ def create_product(args: CreateProductInput) -> str:
         return f"Error in create_product: {str(e)}"
 
 
-@mcp.tool()
 def list_stocks() -> str:
     """
     List current stock levels.
@@ -104,7 +97,6 @@ def list_stocks() -> str:
         return f"Error in list_stocks: {str(e)}"
 
 
-@mcp.tool()
 def add_stock(args: AddStockInput) -> str:
     """
     Add stock for a product.
@@ -125,13 +117,14 @@ def add_stock(args: AddStockInput) -> str:
         return f"Error in add_stock: {str(e)}"
 
 
-@mcp.tool()
 def consume_stock(args: ConsumeStockInput) -> str:
     """
     Consume a certain amount of a stock of a product.
     """
     try:
         pid = get_product(args.product_name)
+        if pid == DEFAULT_NOT_FOUND_MESSAGE:
+            return f'Product "{args.product_name}" not found.'
         api_call(f"/stock/products/{pid}/consume", "POST", {"amount": args.amount})
         return f'Consumed {args.amount} of "{args.product_name}".'
 
@@ -139,13 +132,14 @@ def consume_stock(args: ConsumeStockInput) -> str:
         return f"Error in consume_stock: {str(e)}"
 
 
-@mcp.tool()
 def open_stock(args: OpenStockInput) -> str:
     """
     Mark a stock for a product as opened.
     """
     try:
         pid = get_product(args.product_name)
+        if pid == DEFAULT_NOT_FOUND_MESSAGE:
+            return f'Product "{args.product_name}" not found.'
         api_call(f"/stock/products/{pid}/open", "POST", {"amount": args.amount})
         return f'Opened "{args.product_name}".'
 
@@ -153,13 +147,14 @@ def open_stock(args: OpenStockInput) -> str:
         return f"Error in open_stock: {str(e)}"
 
 
-@mcp.tool()
 def list_stock_entries(args: ListStockEntriesInput) -> str:
     """
     List all stock entries for a product. Entries may have different best before dates.
     """
     try:
         pid = get_product(args.product_name)
+        if pid == DEFAULT_NOT_FOUND_MESSAGE:
+            return f'Product "{args.product_name}" not found.'
         entries = api_call(f"/stock/products/{pid}/entries")
 
         lines = [

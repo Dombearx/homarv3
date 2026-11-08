@@ -83,14 +83,14 @@ def generate_image(prompt: str, short_image_title: str) -> str:
         }
     }
 
-    start_time = asyncio.get_event_loop().time()
+    start_time = time.monotonic()
     print("Sending request to endpoint")
     run_request = endpoint.run(payload)
 
     while run_request.status() != "COMPLETED":
         time.sleep(1)
     result = run_request.output()
-    end_time = asyncio.get_event_loop().time()
+    end_time = time.monotonic()
     print(f"Image generation completed in {end_time - start_time:.2f} seconds.")
 
     file_uuid = uuid.uuid4().hex

@@ -24,8 +24,8 @@ class UserType(StrEnum):
     GUEST = auto()
 
 
-# Tools accessible to Guest users (restricted accounts)
-GUEST_ALLOWED_TOOLS: set[str] = {"home_assistant_api"}
+# Capabilities (by id) accessible to Guest users (restricted accounts)
+GUEST_ALLOWED_CAPABILITIES: set[str] = {"home_assistant"}
 
 # Discord role name → UserType mapping (case-insensitive).
 # The first match in priority order (ADMIN > DEFAULT > GUEST) wins.
@@ -77,6 +77,8 @@ class MyDeps:
     )
     username: str | None = None
     user_type: UserType = UserType.DEFAULT
+    # async (DeferredToolRequests) -> DeferredToolResults; asks the user to approve tool calls
+    approval_callback: Any | None = None
 
     def __post_init__(self):
         if self.generated_images is None:

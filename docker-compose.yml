@@ -13,3 +13,5 @@ services:
     volumes:
       - ./.env:/app/.env:ro
       - /home/domin/.ssh/marvin_deploy_key:/app/deploy_key:ro
+      - ./gcp-oauth.keys.json:/app/gcp-oauth.keys.json:ro
+      - ./mcp-google-calendar-token.json:/app/mcp-google-calendar-token.json

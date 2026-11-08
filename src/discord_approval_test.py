@@ -184,6 +184,7 @@ class TestToolApprovalIntegration:
         mock_thread.send = AsyncMock()
         mock_message = MagicMock()
         mock_message.id = 12345
+        mock_message.edit = AsyncMock()
         mock_thread.send.return_value = mock_message
 
         # Create a deferred request with args as a JSON string

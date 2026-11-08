@@ -22,9 +22,8 @@ RUN poetry config virtualenvs.create false && \
 COPY main.py ./
 COPY src/ ./src/
 
-# copy credentials for google calendar mcp server
-COPY gcp-oauth.keys.json ./
-COPY mcp-google-calendar-token.json ./
+# Google Calendar credentials are mounted by docker-compose (not baked into the image), so a
+# refreshed token survives container re-creation.
 
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh

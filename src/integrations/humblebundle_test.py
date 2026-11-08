@@ -1,8 +1,8 @@
-"""Unit tests for humblebundle_agent.py module."""
+"""Unit tests for humblebundle.py module."""
 
 import pytest
 from unittest.mock import Mock, patch
-from src.agents_as_tools.humblebundle_agent import (
+from src.integrations.humblebundle import (
     list_bundles,
     get_bundle_details,
     _get_category,
@@ -17,7 +17,7 @@ from src.agents_as_tools.humblebundle_agent import (
 class TestListBundles:
     """Test the list_bundles function."""
 
-    @patch("src.agents_as_tools.humblebundle_agent.httpx.get")
+    @patch("src.integrations.humblebundle.httpx.get")
     def test_list_bundles_success(self, mock_get):
         """Test successful bundle listing."""
         # Mock HTML response with bundle data
@@ -50,7 +50,7 @@ class TestListBundles:
         assert "https://www.humblebundle.com" in result
         assert "games" in result and "books" in result
 
-    @patch("src.agents_as_tools.humblebundle_agent.httpx.get")
+    @patch("src.integrations.humblebundle.httpx.get")
     def test_list_bundles_no_bundles(self, mock_get):
         """Test when no bundles are found."""
         mock_response = Mock()
@@ -62,7 +62,7 @@ class TestListBundles:
 
         assert "No bundles found" in result or "try again" in result.lower()
 
-    @patch("src.agents_as_tools.humblebundle_agent.httpx.get")
+    @patch("src.integrations.humblebundle.httpx.get")
     def test_list_bundles_http_error(self, mock_get):
         """Test handling of HTTP errors."""
         import httpx
@@ -73,7 +73,7 @@ class TestListBundles:
 
         assert "Error" in result
 
-    @patch("src.agents_as_tools.humblebundle_agent.httpx.get")
+    @patch("src.integrations.humblebundle.httpx.get")
     def test_list_bundles_generic_exception(self, mock_get):
         """Test handling of generic exceptions."""
         mock_get.side_effect = Exception("Unexpected error")
@@ -82,7 +82,7 @@ class TestListBundles:
 
         assert "Error" in result
 
-    @patch("src.agents_as_tools.humblebundle_agent.httpx.get")
+    @patch("src.integrations.humblebundle.httpx.get")
     def test_list_bundles_filter_by_games(self, mock_get):
         """Test filtering bundles by games type."""
         mock_html = """
@@ -112,7 +112,7 @@ class TestListBundles:
         assert "Humble Game Bundle: Test Games" in result
         assert "Humble Book Bundle: Test Books" not in result
 
-    @patch("src.agents_as_tools.humblebundle_agent.httpx.get")
+    @patch("src.integrations.humblebundle.httpx.get")
     def test_list_bundles_filter_by_books(self, mock_get):
         """Test filtering bundles by books type."""
         mock_html = """
@@ -146,8 +146,8 @@ class TestListBundles:
 class TestGetBundleDetails:
     """Test the get_bundle_details function."""
 
-    @patch("src.agents_as_tools.humblebundle_agent.httpx.get")
-    @patch("src.agents_as_tools.humblebundle_agent._get_bundles_data")
+    @patch("src.integrations.humblebundle.httpx.get")
+    @patch("src.integrations.humblebundle._get_bundles_data")
     def test_get_bundle_details_success(self, mock_get_bundles, mock_get):
         """Test successful bundle detail retrieval."""
         # Mock _get_bundles_data to return a bundle
@@ -186,7 +186,7 @@ class TestGetBundleDetails:
         assert "https://www.humblebundle.com" in result
         assert "games" in result
 
-    @patch("src.agents_as_tools.humblebundle_agent._get_bundles_data")
+    @patch("src.integrations.humblebundle._get_bundles_data")
     def test_get_bundle_details_not_found(self, mock_get_bundles):
         """Test when bundle is not found."""
         mock_get_bundles.return_value = []
@@ -195,8 +195,8 @@ class TestGetBundleDetails:
 
         assert "not found" in result.lower()
 
-    @patch("src.agents_as_tools.humblebundle_agent.httpx.get")
-    @patch("src.agents_as_tools.humblebundle_agent._get_bundles_data")
+    @patch("src.integrations.humblebundle.httpx.get")
+    @patch("src.integrations.humblebundle._get_bundles_data")
     def test_get_bundle_details_http_error(self, mock_get_bundles, mock_get):
         """Test handling of HTTP errors when fetching details."""
         import httpx

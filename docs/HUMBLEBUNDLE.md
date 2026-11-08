@@ -45,7 +45,7 @@ For each bundle, the agent provides:
 
 ### Implementation
 
-The HumbleBundle agent is implemented in `src/agents_as_tools/humblebundle_agent.py` and includes:
+The HumbleBundle integration is implemented in `src/integrations/humblebundle.py` (exposed to Homar by `src/capabilities/humblebundle.py`) and includes:
 
 1. **list_bundles()**: Scrapes the main bundles page and returns a formatted list
 2. **get_bundle_details(bundle_name)**: Fetches detailed information about a specific bundle
@@ -58,7 +58,7 @@ The HumbleBundle agent is implemented in `src/agents_as_tools/humblebundle_agent
 
 ### Testing
 
-Comprehensive unit tests are in `src/agents_as_tools/humblebundle_agent_test.py`:
+Comprehensive unit tests are in `src/integrations/humblebundle_test.py`:
 - Success scenarios with mock data
 - Error handling (HTTP errors, no data found)
 - Bundle detail retrieval

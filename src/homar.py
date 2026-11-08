@@ -1,29 +1,33 @@
 import os
 import subprocess
-from pydantic_ai import Agent, RunContext, DeferredToolRequests, ModelRetry
-from pydantic_ai.mcp import MCPServerStreamableHTTP, MCPServerSSE
-import httpx
-import asyncio
-import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
 from dotenv import load_dotenv
-from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart
-from pydantic_ai.models.function import AgentInfo, FunctionModel
-from pydantic_ai.models.openai import OpenAIResponsesModel, OpenAIResponsesModelSettings
 from loguru import logger
+from pydantic_ai import (
+    Agent,
+    DeferredToolRequests,
+    DeferredToolResults,
+    ModelMessage,
+    RunContext,
+)
+from pydantic_ai.capabilities import Capability, HandleDeferredToolCalls
+from pydantic_ai.models.openai import (
+    OpenAIResponsesModel,
+    OpenAIResponsesModelSettings,
+)
+from pydantic_ai.providers.openai import OpenAIProvider
 
 load_dotenv()
-from src.agents_as_tools.todoist_agent import todoist_agent
-from src.agents_as_tools.home_assistant_agent import home_assistant_agent
-from src.agents_as_tools.image_generation_agent import image_generation_agent
-from src.agents_as_tools.google_calendar_agent import google_calendar_agent
-from src.agents_as_tools.humblebundle_agent import humblebundle_agent
+from src.capabilities import get_domain_capabilities
 from src.delayed_message_scheduler import get_scheduler
-from src.models.schemas import MyDeps, UserType, GUEST_ALLOWED_TOOLS
+from src.models.schemas import MyDeps, UserType
 
 # Constants
 MAX_DELAY_SECONDS = 86400 * 7  # 7 days
+HOMAR_MODEL = os.getenv("HOMAR_MODEL", "openai:gpt-5.4-mini")
+TIMEZONE = "Europe/Warsaw"
 
 
 def _format_delay_seconds(seconds: int) -> str:
@@ -40,207 +44,76 @@ def _format_delay_seconds(seconds: int) -> str:
     return f"{hours} hours"
 
 
-def _check_tool_access(ctx: RunContext[MyDeps], tool_name: str) -> str | None:
-    """Return an error string if the user lacks access to *tool_name*, else None."""
-    if (
-        ctx.deps is not None
-        and ctx.deps.user_type == UserType.GUEST
-        and tool_name not in GUEST_ALLOWED_TOOLS
-    ):
-        username = ctx.deps.username or "unknown"
-        return f"Access denied: user '{username}' (guest) is not allowed to use the '{tool_name}' tool."
-    return None
+HOMAR_INSTRUCTIONS = """
+Nazywasz się Homar. Jesteś domowym asystentem na Discordzie. Masz poczucie humoru, ale przede wszystkim jesteś skuteczny.
 
+Jak działasz:
+- Wykonuj polecenia od razu, korzystając z narzędzi. Jesteś domyślny - jeśli polecenie da się sensownie zinterpretować, działaj zamiast dopytywać.
+- Twoje specjalistyczne możliwości (dom, Todoist, kalendarz, zapasy, obrazy...) są w katalogu poniżej. Gdy polecenie dotyczy którejś z nich, załaduj ją narzędziem `load_capability` i dopiero wtedy działaj. Możesz załadować kilka, jeśli zadanie tego wymaga.
+- Zanim odpowiesz, że czegoś nie potrafisz, sprawdź katalog. Jeśli nic nie pasuje, powiedz to wprost w jednym zdaniu.
+- Możesz analizować obrazy wysłane przez użytkownika.
+- Polecenia "za godzinę"/"o 22:00" realizuj przez zaplanowanie wiadomości do siebie (`send_delayed_message` / `send_scheduled_message`), a gdy wiadomość przyjdzie - po prostu ją wykonaj.
+
+Jak odpowiadasz:
+- Krótko i konkretnie, po polsku. Po wykonaniu akcji potwierdź jednym zdaniem, co zrobiłeś.
+- Nie kończ odpowiedzi pytaniami w stylu "Czy mogę jeszcze w czymś pomóc?" ani listą propozycji.
+- Nigdy nie proponuj ani nie obiecuj czynności, do których nie masz narzędzia (np. sterowania urządzeniem, którego nie widzisz w Home Assistant).
+- Propozycję dalszego kroku składaj tylko wyjątkowo: gdy jest bezpośrednio związana z poleceniem, wyraźnie przydatna i na pewno potrafisz ją wykonać.
+- Jeśli narzędzie zwróci błąd, powiedz krótko, co się nie udało - nie udawaj sukcesu.
+"""
 
 settings = OpenAIResponsesModelSettings(
     openai_reasoning_effort="low",
     openai_reasoning_summary="concise",
 )
 
+
+async def _handle_approvals(
+    ctx: RunContext[MyDeps], requests: DeferredToolRequests
+) -> DeferredToolResults | None:
+    """Ask the user (e.g. via Discord buttons) to approve tool calls without ending the run."""
+    if ctx.deps is None or ctx.deps.approval_callback is None:
+        return None
+    return await ctx.deps.approval_callback(requests)
+
+
+def _build_model(model_name: str) -> OpenAIResponsesModel | str:
+    """Build the OpenAI model with tools revealed as plain tool-list additions.
+
+    With OpenAI's native `additional_tools` reveal, gpt-5.4-mini often doesn't notice the
+    tools of a capability it has just loaded and starts calling unrelated tools. Listing the
+    revealed tools in `tools` costs a prompt-cache miss but works reliably.
+    """
+    provider_name, _, name = model_name.partition(":")
+    if provider_name not in ("openai", "openai-responses"):
+        return model_name
+    profile = OpenAIProvider().model_profile(name) or {}
+    profile = {**profile, "tool_addition_mode": None, "tool_deferral_mode": None}
+    return OpenAIResponsesModel(name, profile=profile)
+
+
 homar = Agent(
-    "openai:gpt-5-mini",
+    _build_model(HOMAR_MODEL),
     deps_type=MyDeps,
     output_type=str | DeferredToolRequests,
-    instructions="Nazywasz się Homar. Jesteś domowym asystentem. Wykonuj polecenia użytkownika korzystając z swojej wiedzy i dostępnych narzędzi. Odpowiadaj krótko i zwięźle, nie oferuj dodatkowej pomocy i proponuj kolejnych działań. Jesteś dokładny i masz poczucie humoru. Jesteś domyślny, potrafisz zrozumieć polecenie nawet jeżeli nie było do końca sprecyzowane. Korzystaj z swojej wiedzy. Najczęściej będziesz musiał wykorzystać narzędzia do wykonania polecenia. Możesz również analizować obrazy, które użytkownik wysyła.",
+    instructions=HOMAR_INSTRUCTIONS,
     model_settings=settings,
+    retries={"tools": 3},
+    capabilities=[HandleDeferredToolCalls(_handle_approvals)],
 )
 
 
-@homar.tool(retries=3)
-async def todoist_api(ctx: RunContext[MyDeps], command: str) -> str:
-    """Use this tool to interact with the Todoist API - todos, shopping list, tasks, things to remember, etc.
-
-    Args:
-        ctx: The run context, including usage metadata.
-        command: The natural language command to execute.
-
-    Returns:
-        The response from the Todoist API as a string.
-    """
-    try:
-        if error := _check_tool_access(ctx, "todoist_api"):
-            return error
-        r = await todoist_agent.run(
-            command,
-            deps=ctx.deps,
-            usage=ctx.usage,
-        )
-        return r.output
-    except Exception as e:
-        logger.warning(f"Todoist API tool error: {e}")
-        raise ModelRetry(
-            f"The Todoist API call failed with error: {str(e)}. Please try again with a different approach or rephrase the command."
-        )
+@homar.instructions
+def current_context(ctx: RunContext[MyDeps]) -> str:
+    now = datetime.now(tz=ZoneInfo(TIMEZONE))
+    lines = [f"Teraz jest {now.strftime('%A, %Y-%m-%d %H:%M')} (Europe/Warsaw)."]
+    if ctx.deps and ctx.deps.username:
+        lines.append(f"Piszesz z użytkownikiem: {ctx.deps.username}.")
+    return "\n".join(lines)
 
 
-@homar.tool(retries=3)
-async def home_assistant_api(ctx: RunContext[MyDeps], command: str) -> str:
-    """Use this tool to interact with the Home Assistant API - check status and control devices such as: lights, pc.
-
-    Args:
-        ctx: The run context, including usage metadata.
-        command: The natural language command to execute.
-
-    Returns:
-        The response from the Home Assistant API as a string.
-    """
-    try:
-        r = await home_assistant_agent.run(
-            command,
-            deps=ctx.deps,
-            usage=ctx.usage,
-        )
-        return r.output
-    except Exception as e:
-        logger.warning(f"Home Assistant API tool error: {e}")
-        raise ModelRetry(
-            f"The Home Assistant API call failed with error: {str(e)}. Please try again with a different approach or be more specific about the device or action."
-        )
-
-
-@homar.tool(retries=3)
-async def image_generation_api(ctx: RunContext[MyDeps], description: str) -> str:
-    """Use this tool to generate images.
-
-    Args:
-        ctx: The run context, including usage metadata.
-        description: The simple natural language description of image that should contains all imporant details.
-
-    Returns:
-        The filepath of the generated image.
-    """
-    try:
-        if error := _check_tool_access(ctx, "image_generation_api"):
-            return error
-        from src.agents_as_tools.image_generation_agent import generate_image
-
-        r = await image_generation_agent.run(
-            description,
-            deps=ctx.deps,
-            usage=ctx.usage,
-        )
-
-        # Generate the actual image file
-        image_filename = generate_image(r.output, "homar_generated")
-
-        # Store the image filename in deps so it can be sent back
-        if ctx.deps:
-            from src.agents_as_tools.consts import IMAGE_GENERATION_OUTPUT_DIR
-
-            image_path = IMAGE_GENERATION_OUTPUT_DIR / image_filename
-            ctx.deps.generated_images.append(str(image_path))
-
-        return f"Image generated successfully: {image_filename}"
-    except Exception as e:
-        logger.warning(f"Image generation API tool error: {e}")
-        raise ModelRetry(
-            f"Image generation failed with error: {str(e)}. Please try again with a clearer or more specific description."
-        )
-
-
-@homar.tool(retries=3)
-async def grocy_api(ctx: RunContext[MyDeps], command: str) -> str:
-    """Use this tool to interact with the Grocy API - home groceries management. Allows to add products, check stock, consume stock, open stock, etc.
-    Use whenever user informs about groceries - added to fridge, opened, consumed, etc.
-
-    Args:
-        ctx: The run context, including usage metadata.
-        command: The natural language command to execute.
-
-    Returns:
-        The response from the Grocy API as a string.
-    """
-    try:
-        if error := _check_tool_access(ctx, "grocy_api"):
-            return error
-        from src.agents_as_tools.grocy_agent import grocy_agent
-
-        r = await grocy_agent.run(
-            command,
-            deps=ctx.deps,
-            usage=ctx.usage,
-        )
-        return r.output
-    except Exception as e:
-        logger.warning(f"Grocy API tool error: {e}")
-        raise ModelRetry(
-            f"The Grocy API call failed with error: {str(e)}. Please try again with a different approach or be more specific about the product or action."
-        )
-
-
-@homar.tool(retries=3)
-async def google_calendar_api(ctx: RunContext[MyDeps], command: str) -> str:
-    """Use this tool to interact with Google Calendar - manage events, appointments, meetings, reminders with dates.
-    Use whenever user asks about calendar, schedule, events, appointments, or wants to create/check/modify calendar entries.
-
-    Args:
-        command: The natural language command to execute.
-
-    Returns:
-        The response from the Google Calendar API as a string.
-    """
-    try:
-        if error := _check_tool_access(ctx, "google_calendar_api"):
-            return error
-        r = await google_calendar_agent.run(
-            command,
-            deps=ctx.deps,
-            usage=ctx.usage,
-        )
-        return r.output
-    except Exception as e:
-        logger.warning(f"Google Calendar API tool error: {e}")
-        raise ModelRetry(
-            f"The Google Calendar API call failed with error: {str(e)}. Please try again with a different approach or provide more specific date/time information."
-        )
-
-
-@homar.tool(retries=3)
-async def humblebundle_api(ctx: RunContext[MyDeps], command: str) -> str:
-    """Use this tool to check HumbleBundle deals and bundles.
-    Use when user asks about HumbleBundle, game bundles, book bundles, software bundles, or current deals on HumbleBundle.
-    Can list available bundles or get details about specific bundles.
-
-    Args:
-        command: The natural language command to execute (e.g., "list all bundles", "show me game bundles", "details about book bundle").
-
-    Returns:
-        Information about HumbleBundle bundles as a string.
-    """
-    try:
-        if error := _check_tool_access(ctx, "humblebundle_api"):
-            return error
-        r = await humblebundle_agent.run(
-            command,
-            deps=ctx.deps,
-            usage=ctx.usage,
-        )
-        return r.output
-    except Exception as e:
-        logger.warning(f"HumbleBundle API tool error: {e}")
-        raise ModelRetry(
-            f"The HumbleBundle API call failed with error: {str(e)}. Please try again with a different approach or rephrase your request."
-        )
+# Admin/default users only - guests don't get it.
+maintenance = Capability(id="maintenance")
 
 
 def _run_ssh_command(label: str, command: list[str]) -> tuple[str | None, str | None]:
@@ -258,15 +131,17 @@ def _run_ssh_command(label: str, command: list[str]) -> tuple[str | None, str | 
         return None, f"{label} error: {str(e)}"
 
 
-@homar.tool_plain(requires_approval=True)
+@maintenance.tool_plain(requires_approval=True)
 def update_marvin() -> str:
     """
     Update Marvin by calling update script on host via SSH.
     """
     ssh_command = [
         "ssh",
-        "-i", "/app/deploy_key",
-        "-o", "StrictHostKeyChecking=no",
+        "-i",
+        "/app/deploy_key",
+        "-o",
+        "StrictHostKeyChecking=no",
         "domin@172.17.0.1",
         "/home/domin/update_marvin.sh",
     ]
@@ -276,28 +151,6 @@ def update_marvin() -> str:
         return error
 
     return f"Remote update successful:\n{stdout}"
-
-
-@homar.tool_plain(requires_approval=True)
-def approval_test_tool(test_parameter: str) -> str:
-    """Test tool for Discord approval mechanism - this tool always requires user confirmation.
-
-    This is a simple test tool to demonstrate the approval workflow. When called,
-    it will require the user to approve or reject the action via Discord UI.
-
-    Args:
-        test_parameter: A test parameter to demonstrate how parameters are displayed for approval
-
-    Returns:
-        A success message if approved
-    """
-    return f"Test tool executed successfully with parameter: {test_parameter}"
-
-
-@homar.tool_plain
-def calculate_sum(a: int, b: int) -> int:
-    """Use this tool to calculate the sum of two integers."""
-    return a + b
 
 
 @homar.tool(retries=2)
@@ -561,37 +414,36 @@ async def cancel_scheduled_message(ctx: RunContext[MyDeps], message_id: str) -> 
     return f"Could not find scheduled message with ID: {message_id}. Use list_scheduled_messages to see available IDs."
 
 
-async def run_homar_with_messages(
-    messages: list[ModelMessage], deps: MyDeps = None
-) -> str:
-    if deps is None:
-        deps = MyDeps()
-    agent_response = await homar.run(messages, deps=deps)
-    return agent_response.output, agent_response.new_messages()
-
-
-async def run_homar(message: str, channel: str = None, deps: MyDeps = None) -> str:
-    if deps is None:
-        deps = MyDeps()
-    agent_response = await homar.run(message, deps=deps)
-    return agent_response.output
+def _capabilities_for(deps: MyDeps) -> list:
+    capabilities = get_domain_capabilities(deps.user_type)
+    if deps.user_type != UserType.GUEST:
+        capabilities.append(maintenance)
+    return capabilities
 
 
 async def run_homar_with_history(
-    new_message: str, history: list[ModelMessage], deps: MyDeps = None
+    new_message: str | list, history: list[ModelMessage], deps: MyDeps | None = None
 ) -> tuple[str | DeferredToolRequests, list[ModelMessage], list[str]]:
     if deps is None:
         deps = MyDeps()
-    agent_response = await homar.run(new_message, message_history=history, deps=deps)
+    agent_response = await homar.run(
+        new_message,
+        message_history=history,
+        deps=deps,
+        capabilities=_capabilities_for(deps),
+    )
     return agent_response.output, agent_response.new_messages(), deps.generated_images
 
 
-def print_schema(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
-    tool = info.function_tools[2]
-    print(tool.description)
-    print(tool.parameters_json_schema)
-    return ModelResponse(parts=[TextPart("calculate_sum")])
+async def run_homar(
+    message: str, deps: MyDeps | None = None
+) -> str | DeferredToolRequests:
+    output, _, _ = await run_homar_with_history(message, [], deps)
+    return output
 
 
 if __name__ == "__main__":
-    homar.run_sync("hello", model=FunctionModel(print_schema))
+    import asyncio
+    import sys
+
+    print(asyncio.run(run_homar(" ".join(sys.argv[1:]) or "Co potrafisz?")))

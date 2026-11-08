@@ -2,8 +2,7 @@
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock
-from src.homar import _format_delay_seconds, _check_tool_access
+from src.homar import _format_delay_seconds, _capabilities_for
 from src.models.schemas import MyDeps, UserType
 
 
@@ -135,56 +134,30 @@ class TestDatetimeParsing:
         assert parsed.minute == 0
 
 
-class TestCheckToolAccess:
-    """Test the _check_tool_access helper."""
+class TestCapabilityAccess:
+    """Test which capabilities each user type gets."""
 
-    def _make_ctx(self, user_type: UserType, username: str = "testuser"):
-        ctx = MagicMock()
-        ctx.deps = MyDeps(username=username, user_type=user_type)
-        return ctx
+    def _ids(self, user_type: UserType) -> set[str]:
+        return {c.id for c in _capabilities_for(MyDeps(user_type=user_type))}
 
-    def test_admin_can_use_any_tool(self):
-        ctx = self._make_ctx(UserType.ADMIN)
-        assert _check_tool_access(ctx, "todoist_api") is None
-        assert _check_tool_access(ctx, "grocy_api") is None
-        assert _check_tool_access(ctx, "home_assistant_api") is None
+    def test_admin_gets_everything(self):
+        assert self._ids(UserType.ADMIN) == {
+            "home_assistant",
+            "todoist",
+            "google_calendar",
+            "grocy",
+            "image_generation",
+            "humblebundle",
+            "maintenance",
+        }
 
-    def test_default_can_use_any_tool(self):
-        ctx = self._make_ctx(UserType.DEFAULT)
-        assert _check_tool_access(ctx, "todoist_api") is None
-        assert _check_tool_access(ctx, "image_generation_api") is None
-        assert _check_tool_access(ctx, "home_assistant_api") is None
+    def test_default_gets_everything(self):
+        assert self._ids(UserType.DEFAULT) == self._ids(UserType.ADMIN)
 
-    def test_guest_can_use_home_assistant(self):
-        ctx = self._make_ctx(UserType.GUEST, "alice")
-        assert _check_tool_access(ctx, "home_assistant_api") is None
+    def test_guest_gets_only_home_assistant(self):
+        assert self._ids(UserType.GUEST) == {"home_assistant"}
 
-    def test_guest_cannot_use_todoist(self):
-        ctx = self._make_ctx(UserType.GUEST, "alice")
-        result = _check_tool_access(ctx, "todoist_api")
-        assert result is not None
-        assert "alice" in result
-        assert "guest" in result
-
-    def test_guest_cannot_use_grocy(self):
-        ctx = self._make_ctx(UserType.GUEST, "bob")
-        result = _check_tool_access(ctx, "grocy_api")
-        assert result is not None
-        assert "bob" in result
-
-    def test_guest_cannot_use_image_generation(self):
-        ctx = self._make_ctx(UserType.GUEST)
-        assert _check_tool_access(ctx, "image_generation_api") is not None
-
-    def test_guest_cannot_use_google_calendar(self):
-        ctx = self._make_ctx(UserType.GUEST)
-        assert _check_tool_access(ctx, "google_calendar_api") is not None
-
-    def test_guest_cannot_use_humblebundle(self):
-        ctx = self._make_ctx(UserType.GUEST)
-        assert _check_tool_access(ctx, "humblebundle_api") is not None
-
-    def test_no_deps_allows_access(self):
-        ctx = MagicMock()
-        ctx.deps = None
-        assert _check_tool_access(ctx, "todoist_api") is None
+    def test_capability_list_is_not_shared_between_runs(self):
+        guest = _capabilities_for(MyDeps(user_type=UserType.GUEST))
+        guest.append(object())
+        assert self._ids(UserType.GUEST) == {"home_assistant"}

@@ -2,7 +2,7 @@
 
 from src.models.schemas import (
     UserType,
-    GUEST_ALLOWED_TOOLS,
+    GUEST_ALLOWED_CAPABILITIES,
     get_user_type_from_discord_roles,
     MyDeps,
 )
@@ -17,21 +17,11 @@ class TestUserType:
         assert UserType.GUEST == "guest"
 
 
-class TestGuestAllowedTools:
-    """Test that GUEST_ALLOWED_TOOLS contains only home_assistant_api."""
+class TestGuestAllowedCapabilities:
+    """Test that guests may only use Home Assistant."""
 
-    def test_home_assistant_allowed(self):
-        assert "home_assistant_api" in GUEST_ALLOWED_TOOLS
-
-    def test_other_tools_not_allowed(self):
-        for tool in (
-            "todoist_api",
-            "grocy_api",
-            "image_generation_api",
-            "google_calendar_api",
-            "humblebundle_api",
-        ):
-            assert tool not in GUEST_ALLOWED_TOOLS
+    def test_only_home_assistant_allowed(self):
+        assert GUEST_ALLOWED_CAPABILITIES == {"home_assistant"}
 
 
 class TestGetUserTypeFromDiscordRoles:

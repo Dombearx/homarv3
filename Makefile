@@ -1,4 +1,4 @@
-.PHONY: run format test docker_build docker_save manage_remote deploy
+.PHONY: run format test docker_build docker_save manage_remote deploy google_auth
 
 run:
 	poetry run python main.py
@@ -24,6 +24,7 @@ manage_remote:
 	scp ./images/homarv3.tar domin@192.168.50.30:/home/domin/images
 	scp ./docker-compose.yml domin@192.168.50.30:/home/domin/homarv3/
 	scp ./.env domin@192.168.50.30:/home/domin/homarv3/
+	scp ./gcp-oauth.keys.json ./mcp-google-calendar-token.json domin@192.168.50.30:/home/domin/homarv3/
 	ssh 192.168.50.30 "cd /home/domin/homarv3; docker compose stop"
 	ssh 192.168.50.30 "cd /home/domin/homarv3; docker compose down"
 	ssh 192.168.50.30 "docker load -i /home/domin/images/homarv3.tar"
@@ -32,3 +33,7 @@ manage_remote:
 	ssh 192.168.50.30 "cd /home/domin/homarv3; docker compose up -d"
 
 deploy: docker_build docker_save manage_remote
+
+# Re-authorize Google Calendar (opens a browser); then run `make deploy` to ship the new token
+google_auth:
+	GOOGLE_OAUTH_CREDENTIALS=./gcp-oauth.keys.json GOOGLE_CALENDAR_MCP_TOKEN_PATH=./mcp-google-calendar-token.json npx -y @cocal/google-calendar-mcp auth

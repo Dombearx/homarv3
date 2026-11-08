@@ -6,7 +6,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     nodejs \
     npm \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g @cocal/google-calendar-mcp
 
 # Install poetry
 RUN pip install poetry==2.2.1

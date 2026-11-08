@@ -1,11 +1,14 @@
-"""Google Calendar capability backed by the @cocal/google-calendar-mcp server (run via npx)."""
+"""Google Calendar capability backed by the @cocal/google-calendar-mcp server."""
 
 import os
+import shutil
 
 from dotenv import load_dotenv
 from fastmcp.client.transports import StdioTransport
 from pydantic_ai.capabilities import Capability
 from pydantic_ai.mcp import MCPToolset
+
+from src.capabilities.optional_toolset import optional
 
 load_dotenv()
 
@@ -22,10 +25,17 @@ GOOGLE_CALENDAR_TOOLS = {
     "get-freebusy",
 }
 
-google_calendar_toolset = MCPToolset(
+# Installed globally in the Docker image; falls back to npx for local runs.
+GOOGLE_CALENDAR_MCP_COMMAND = (
+    ["google-calendar-mcp"]
+    if shutil.which("google-calendar-mcp")
+    else ["npx", "-y", "@cocal/google-calendar-mcp"]
+)
+
+google_calendar_mcp = MCPToolset(
     StdioTransport(
-        "npx",
-        ["-y", "@cocal/google-calendar-mcp"],
+        GOOGLE_CALENDAR_MCP_COMMAND[0],
+        GOOGLE_CALENDAR_MCP_COMMAND[1:],
         env={
             "GOOGLE_OAUTH_CREDENTIALS": os.getenv("GOOGLE_OAUTH_CREDENTIALS", ""),
             "GOOGLE_CALENDAR_MCP_TOKEN_PATH": os.getenv(
@@ -36,7 +46,13 @@ google_calendar_toolset = MCPToolset(
         },
     ),
     id="google_calendar_mcp",
-).filtered(lambda ctx, tool_def: tool_def.name in GOOGLE_CALENDAR_TOOLS)
+)
+google_calendar_toolset = optional(
+    google_calendar_mcp.filtered(
+        lambda ctx, tool_def: tool_def.name in GOOGLE_CALENDAR_TOOLS
+    ),
+    "Google Calendar MCP",
+)
 
 GOOGLE_CALENDAR_INSTRUCTIONS = """
 Zasady pracy z Google Calendar:

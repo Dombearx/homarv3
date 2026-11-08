@@ -72,9 +72,7 @@ class TestTodoistShoppingList:
         request = AsyncMock(side_effect=[parent, {}, {}])
 
         with patch.object(todoist_module, "_request", request):
-            result = await todoist_module.create_shopping_list(
-                None, ["mleko", "chleb"]
-            )
+            result = await todoist_module.create_shopping_list(None, ["mleko", "chleb"])
 
         parent_call, *item_calls = request.await_args_list
         assert parent_call.args == ("POST", "/tasks")
@@ -110,3 +108,22 @@ class TestTodoistShoppingList:
             "priority": 4,
             "project_id": "proj1",
         }
+
+
+class TestOptionalToolset:
+    @pytest.mark.asyncio
+    async def test_unreachable_mcp_server_does_not_fail_the_run(self):
+        from pydantic_ai import Agent
+        from pydantic_ai.mcp import MCPToolset
+
+        from src.capabilities.optional_toolset import optional
+
+        dead = optional(MCPToolset("http://127.0.0.1:9/mcp"), "dead MCP")
+
+        def model(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            return ModelResponse(parts=[TextPart("still alive")])
+
+        agent = Agent(FunctionModel(model), toolsets=[dead])
+        result = await agent.run("hej")
+
+        assert result.output == "still alive"

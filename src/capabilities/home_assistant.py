@@ -1,5 +1,6 @@
 """Home Assistant capability backed by the Home Assistant MCP server (Assist API)."""
 
+import asyncio
 import os
 
 from dotenv import load_dotenv
@@ -8,6 +9,7 @@ from pydantic_ai import RunContext
 from pydantic_ai.capabilities import Capability
 from pydantic_ai.mcp import MCPToolset
 
+from src.capabilities.optional_toolset import optional
 from src.models.schemas import MyDeps
 
 load_dotenv()
@@ -21,8 +23,11 @@ home_assistant_mcp = MCPToolset(
     id="home_assistant_mcp",
     headers={"Authorization": f"Bearer {os.getenv('HOME_ASSISTANT_TOKEN')}"},
 )
-home_assistant_toolset = home_assistant_mcp.filtered(
-    lambda ctx, tool_def: tool_def.name not in HIDDEN_HOME_ASSISTANT_TOOLS
+home_assistant_toolset = optional(
+    home_assistant_mcp.filtered(
+        lambda ctx, tool_def: tool_def.name not in HIDDEN_HOME_ASSISTANT_TOOLS
+    ),
+    "Home Assistant MCP",
 )
 
 HOME_ASSISTANT_INSTRUCTIONS = """
@@ -55,8 +60,9 @@ home_assistant = Capability(
 async def current_home_state(ctx: RunContext[MyDeps]) -> str:
     """Inject the current state of exposed devices so the model needs no extra tool call."""
     try:
-        result = await home_assistant_mcp.direct_call_tool("GetLiveContext", {})
-    except Exception as e:
+        async with asyncio.timeout(10):
+            result = await home_assistant_mcp.direct_call_tool("GetLiveContext", {})
+    except (Exception, TimeoutError) as e:
         logger.warning(f"Could not fetch Home Assistant live context: {e}")
         return "Aktualny stan domu jest niedostępny - użyj narzędzia GetLiveContext."
     if isinstance(result, dict):
